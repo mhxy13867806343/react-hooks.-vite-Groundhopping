@@ -4,6 +4,7 @@ import { keyframes, css } from '@emotion/react';
 import { Button as AntButton, Modal as AntModal, Select, Space } from 'antd';
 import { SettingOutlined } from '@ant-design/icons';
 import { useGameSettings } from './hooks/useGameSettings';
+import moleImage from '../public/ds.jpg';
 
 const hitSoundUrl = 'https://assets.mixkit.co/active_storage/sfx/2571/2571-preview.mp3';
 const bgmSoundUrl = 'https://assets.mixkit.co/active_storage/sfx/123/123-preview.mp3';
@@ -119,14 +120,12 @@ const translations = {
 };
 
 const GameContainer = styled.div`
-  max-width: 800px;
-  margin: 0 auto;
+  min-height: 100vh;
   padding: 20px;
-  text-align: center;
-  background: #87ceeb;
-  border-radius: 20px;
-  box-shadow: 0 0 20px rgba(0, 0, 0, 0.2);
-  position: relative;
+  background: linear-gradient(135deg, #87CEEB, #4682B4);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
 `;
 
 const ProgressBar = styled.div<{ progress: number }>`
@@ -190,12 +189,12 @@ const Grid = styled.div`
   display: grid;
   grid-template-columns: repeat(3, 1fr);
   gap: 20px;
-  margin: 20px auto;
+  width: 100%;
   max-width: 600px;
-  background: #4a8505;
+  margin: 20px auto;
   padding: 20px;
+  background: #4a8505;
   border-radius: 15px;
-  position: relative;
 `;
 
 const ConfigPanel = styled.div`
@@ -236,9 +235,51 @@ const StatsPanel = styled.div`
   }
 `;
 
-const Button = styled(AntButton)`
-  margin: 5px;
-  min-width: 100px;
+const ButtonContainer = styled.div`
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  align-items: center;
+  margin: 20px 0;
+`;
+
+const StartButton = styled(AntButton)`
+  font-size: 24px;
+  height: auto;
+  padding: 15px 40px;
+  border-radius: 50px;
+  background: #ff6b6b;
+  border: none;
+  color: white;
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
+
+  &:hover {
+    background: #ff5252;
+    color: white;
+  }
+
+  &:active {
+    transform: translateY(2px);
+  }
+`;
+
+const SoundButton = styled(AntButton)`
+  width: 60px;
+  height: 60px;
+  border-radius: 30px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #4a90e2;
+  border: none;
+  color: white;
+  font-size: 24px;
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
+
+  &:hover {
+    background: #357abd;
+    color: white;
+  }
 `;
 
 const Modal = styled(AntModal)`
@@ -300,25 +341,33 @@ const HoleContainer = styled.div`
   background: #5c4029;
   border-radius: 50%;
   box-shadow: inset 0 10px 20px rgba(0, 0, 0, 0.5);
-  cursor: pointer;
   overflow: hidden;
+  cursor: pointer;
 `;
 
-const Mole = styled.div<{ active: boolean }>`
+const Mole = styled.div<{ visible: boolean }>`
   position: absolute;
   width: 100%;
   height: 100%;
   left: 0;
-  bottom: 0;
-  visibility: ${props => props.active ? 'visible' : 'hidden'};
-  animation: ${props => props.active ? popUp : 'none'} 0.5s ease-out;
-  transform-origin: bottom center;
-  background: url('/ds.jpg') no-repeat center center;
+  bottom: ${props => props.visible ? '0' : '100%'};
+  transition: bottom 0.3s ease-in-out;
+  background: url(${moleImage}) no-repeat center bottom;
   background-size: contain;
+  transform-origin: bottom;
+  cursor: pointer;
 
-  &.whacked {
-    animation: ${dizzyAnimation} 0.5s ease-out;
+  &:active {
+    transform: scale(0.95);
   }
+`;
+
+const MoleImage = styled.img`
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  transform: translateY(${props => props.visible ? '0' : '100%'});
+  transition: transform 0.3s ease-in-out;
 `;
 
 const ScoreBoard = styled.div`
@@ -975,28 +1024,30 @@ const App: React.FC = () => {
         </TimeText>
       </ScoreBoard>
 
-      <StyledButton
-        onClick={gameActive ? handleEndGameClick : startGame}
-        disabled={gameActive && !isPaused}
-        style={{ margin: '20px 0' }}
-      >
-        {gameActive 
-          ? (isPaused ? translations[config.language].resumeGame : translations[config.language].endGame)
-          : translations[config.language].startGame}
-      </StyledButton>
+      <ButtonContainer>
+        <StartButton
+          onClick={gameActive ? handleEndGameClick : startGame}
+          disabled={gameActive && !isPaused}
+          style={{ margin: '20px 0' }}
+        >
+          {gameActive 
+            ? (isPaused ? translations[config.language].resumeGame : translations[config.language].endGame)
+            : translations[config.language].startGame}
+        </StartButton>
 
-      <StyledButton 
-        onClick={() => setIsMuted(!isMuted)} 
-        style={{ marginLeft: '10px', backgroundColor: isMuted ? '#999' : '#1890ff' }}
-      >
-        {isMuted ? '🔇' : '🔊'}
-      </StyledButton>
+        <SoundButton 
+          onClick={() => setIsMuted(!isMuted)} 
+          style={{ marginLeft: '10px', backgroundColor: isMuted ? '#999' : '#1890ff' }}
+        >
+          {isMuted ? '🔇' : '🔊'}
+        </SoundButton>
+      </ButtonContainer>
 
       <Grid>
         {positions.map((position, index) => (
           <HoleContainer key={position} onClick={() => whackMole(position)}>
             <Mole 
-              active={moles[position]}
+              visible={moles[position]} 
               className={whackedMoles[position] ? 'whacked' : ''}
             />
           </HoleContainer>
