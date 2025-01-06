@@ -718,17 +718,27 @@ const App: React.FC = () => {
 
   // 处理设置的保存
   const handleSaveSettings = () => {
-    // 保存设置
-    setConfig({
+    const newSettings = {
       ...tempConfig,
-      totalTime: Number(tempConfig.totalTime), // 确保转换为数字
-    });
-    // 关闭设置弹窗
-    setShowSettings(false);
+      totalTime: Number(tempConfig.totalTime),
+      maxMoles: Number(tempConfig.maxMoles),
+      initialSpeed: Number(tempConfig.initialSpeed),
+      minSpeed: Number(tempConfig.minSpeed),
+    };
+    
+    // 保存到 localStorage
+    saveSettings(newSettings);
+    
+    // 更新当前配置
+    setConfig(newSettings);
+    
     // 如果游戏正在进行，更新剩余时间
     if (gameActive) {
-      setTimeLeft(Number(tempConfig.totalTime));
+      setTimeLeft(Number(newSettings.totalTime));
     }
+    
+    // 关闭设置弹窗
+    setShowSettings(false);
   };
 
   // 处理设置的取消
