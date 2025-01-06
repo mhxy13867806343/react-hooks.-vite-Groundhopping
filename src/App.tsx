@@ -3,6 +3,7 @@ import styled from '@emotion/styled';
 import { keyframes } from '@emotion/react';
 import { Button as AntButton, Modal as AntModal, Select, Space } from 'antd';
 import { SettingOutlined } from '@ant-design/icons';
+import { useGameSettings } from './hooks/useGameSettings';
 
 // 游戏配置接口
 interface GameConfig {
@@ -469,15 +470,114 @@ const ConfirmModal = styled(Modal)`
 const App: React.FC = () => {
   const [score, setScore] = useState(0);
   const [gameActive, setGameActive] = useState(false);
-  const [timeLeft, setTimeLeft] = useState(defaultConfig.totalTime);
-  const [activeMoles, setActiveMoles] = useState<number[]>([]);
-  const [whackedMole, setWhackedMole] = useState<number | null>(null);
+  const [timeLeft, setTimeLeft] = useState(0);
   const [highScore, setHighScore] = useState(0);
+  const [moles, setMoles] = useState<boolean[]>(Array(9).fill(false));
+  const [whackedMoles, setWhackedMoles] = useState<boolean[]>(Array(9).fill(false));
   const [isPaused, setIsPaused] = useState(false);
-  const [showEndModal, setShowEndModal] = useState(false);
-  const [config, setConfig] = useState<GameConfig>(defaultConfig);
-  const [showConfirmEndGame, setShowConfirmEndGame] = useState(false);
+  const [showEndConfirm, setShowEndConfirm] = useState(false);
+  const [showGameOver, setShowGameOver] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
+  const { settings, saveSettings } = useGameSettings();
+  const [config, setConfig] = useState<GameConfig>(settings);
+  const [tempConfig, setTempConfig] = useState<GameConfig>(settings);
+
+  // 当settings改变时更新config
+  useEffect(() => {
+    setConfig(settings);
+    setTempConfig(settings);
+  }, [settings]);
+
+  // 处理设置的保存
+  const handleSaveSettings = () => {
+    saveSettings(tempConfig);
+    setShowSettings(false);
+  };
+
+  // 处理设置的取消
+  const handleCancelSettings = () => {
+    setTempConfig(settings);
+    setShowSettings(false);
+  };
+
+  // 处理设置的关闭
+  const handleCloseSettings = () => {
+    setTempConfig(settings);
+    setShowSettings(false);
+  };
+
+  // 渲染设置模态框
+  const renderSettingsModal = () => (
+    <AntModal
+      title={translations[config.language].gameSettings}
+      open={showSettings}
+      onCancel={handleCloseSettings}
+      footer={[
+        <AntButton key="cancel" onClick={handleCancelSettings}>
+          {translations[config.language].cancel}
+        </AntButton>,
+        <AntButton key="save" type="primary" onClick={handleSaveSettings}>
+          {translations[config.language].save}
+        </AntButton>
+      ]}
+    >
+      <Space direction="vertical" style={{ width: '100%' }}>
+        <div>
+          <div style={{ marginBottom: '8px' }}>{translations[config.language].language}</div>
+          <Select
+            value={tempConfig.language}
+            style={{ width: '100%' }}
+            onChange={(value: 'zh' | 'en') => setTempConfig(prev => ({ ...prev, language: value }))}
+            options={[
+              { value: 'zh', label: '中文' },
+              { value: 'en', label: 'English' }
+            ]}
+          />
+        </div>
+        <div>
+          <div style={{ marginBottom: '8px' }}>{translations[config.language].totalTime}</div>
+          <input
+            type="number"
+            value={tempConfig.totalTime}
+            onChange={e => {
+              const value = parseInt(e.target.value) || MIN_TIME;
+              setTempConfig(prev => ({
+                ...prev,
+                totalTime: Math.min(Math.max(value, MIN_TIME), MAX_TIME)
+              }));
+            }}
+            min={MIN_TIME}
+            max={MAX_TIME}
+            style={{ width: '100%', padding: '4px 11px', borderRadius: '6px', border: '1px solid #d9d9d9' }}
+          />
+          <div style={{ fontSize: '12px', color: '#666', marginTop: '4px' }}>
+            {Math.floor(tempConfig.totalTime / 60)}{translations[tempConfig.language].minutes}
+            {tempConfig.totalTime % 60}{translations[tempConfig.language].seconds}
+          </div>
+        </div>
+        <div>
+          <div style={{ marginBottom: '8px' }}>{translations[config.language].maxMoles}</div>
+          <input
+            type="number"
+            value={tempConfig.maxMoles}
+            onChange={e => {
+              const value = parseInt(e.target.value) || MIN_MOLES;
+              setTempConfig(prev => ({
+                ...prev,
+                maxMoles: Math.min(Math.max(value, MIN_MOLES), MAX_MOLES)
+              }));
+            }}
+            min={MIN_MOLES}
+            max={MAX_MOLES}
+            style={{ width: '100%', padding: '4px 11px', borderRadius: '6px', border: '1px solid #d9d9d9' }}
+          />
+          <div style={{ fontSize: '12px', color: '#666', marginTop: '4px' }}>
+            {translations[tempConfig.language].suggestedAmount}: {calculateMolesFromTime(tempConfig.totalTime)}
+          </div>
+        </div>
+      </Space>
+    </AntModal>
+  );
 
   // 处理空格键暂停
   useEffect(() => {
@@ -492,26 +592,7 @@ const App: React.FC = () => {
     return () => window.removeEventListener('keydown', handleKeyPress);
   }, [gameActive]);
 
-  // 处理倒计时
-  useEffect(() => {
-    let timer: number;
-    if (gameActive && !isPaused) {
-      timer = setInterval(() => {
-        setTimeLeft(prev => {
-          if (prev <= 1) {
-            setGameActive(false);
-            setHighScore(current => Math.max(current, score));
-            setShowEndModal(true);
-            return 0;
-          }
-          return prev - 1;
-        });
-      }, 1000) as unknown as number;
-    }
-    return () => clearInterval(timer);
-  }, [gameActive, isPaused, score]);
-
-  // 处理地鼠移动
+  // 地鼠移动逻辑
   useEffect(() => {
     let moleTimer: number;
     if (gameActive && !isPaused) {
@@ -524,73 +605,28 @@ const App: React.FC = () => {
           config.maxMoles
         );
         
-        const newMoles: number[] = [];
+        const newMoles: boolean[] = Array(9).fill(false);
         const availablePositions = Array.from({length: 9}, (_, i) => i)
-          .filter(pos => !activeMoles.includes(pos));
+          .filter(pos => !moles[pos]);
         
-        while (newMoles.length < numberOfMoles && availablePositions.length > 0) {
+        while (newMoles.filter(Boolean).length < numberOfMoles && availablePositions.length > 0) {
           const randomIndex = Math.floor(Math.random() * availablePositions.length);
           const position = availablePositions[randomIndex];
-          newMoles.push(position);
+          newMoles[position] = true;
           availablePositions.splice(randomIndex, 1);
         }
         
-        setActiveMoles(newMoles);
+        setMoles(newMoles);
       }, speed) as unknown as number;
     }
     return () => clearInterval(moleTimer);
-  }, [gameActive, isPaused, timeLeft, config, activeMoles]);
+  }, [gameActive, isPaused, timeLeft, config, moles]);
 
-  const startGame = () => {
-    setScore(0);
-    setGameActive(true);
-    setIsPaused(false);
-    setTimeLeft(config.totalTime);
-    setActiveMoles([]);
-    setShowEndModal(false);
-  };
-
-  const handleConfigChange = (key: keyof GameConfig, value: number | 'zh' | 'en') => {
-    if (key === 'totalTime') {
-      // 时间改变，自动调整地鼠数量
-      const newTime = Math.min(Math.max(value as number, MIN_TIME), MAX_TIME);
-      const newMoles = calculateMolesFromTime(newTime);
-      setConfig(prev => ({
-        ...prev,
-        [key]: newTime,
-        maxMoles: newMoles
-      }));
-    } else if (key === 'maxMoles') {
-      // 地鼠数量改变，自动调整时间
-      const newMoles = Math.min(Math.max(value as number, MIN_MOLES), MAX_MOLES);
-      const newTime = calculateTimeFromMoles(newMoles);
-      setConfig(prev => ({
-        ...prev,
-        [key]: newMoles,
-        totalTime: newTime
-      }));
-    } else if (key === 'language') {
-      setConfig(prev => ({ ...prev, [key]: value }));
-    }
-  };
-
-  const handleOpenSettings = () => {
-    setShowSettings(true);
-  };
-
-  const handleCloseSettings = () => {
-    setShowSettings(false);
-  };
-
-  const handleSaveSettings = () => {
-    setShowSettings(false);
-  };
-
+  // 打地鼠逻辑
   const whackMole = (index: number) => {
-    if (gameActive && !isPaused && activeMoles.includes(index)) {
+    if (gameActive && !isPaused && moles[index]) {
       setScore(prev => prev + 1);
-      setWhackedMole(index);
-      setActiveMoles(prev => prev.filter(mole => mole !== index));
+      setWhackedMoles(prev => prev.map((mole, i) => i === index ? true : mole));
       
       // 播放打击音效
       const audio = new Audio('data:audio/wav;base64,UklGRl9vT19XQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YU');
@@ -598,80 +634,91 @@ const App: React.FC = () => {
       
       // 重置whacked动画状态
       setTimeout(() => {
-        setWhackedMole(null);
+        setWhackedMoles(prev => prev.map((mole, i) => i === index ? false : mole));
       }, 500);
     }
   };
 
-  // 计算进度条百分比
-  const calculateProgress = () => {
-    return ((config.totalTime - timeLeft) / config.totalTime) * 100;
+  // 游戏计时器
+  useEffect(() => {
+    let timer: number;
+    if (gameActive && !isPaused) {
+      timer = setInterval(() => {
+        setTimeLeft(prev => {
+          if (prev <= 1) {
+            setGameActive(false);
+            setHighScore(current => Math.max(current, score));
+            setShowGameOver(true);
+            return 0;
+          }
+          return prev - 1;
+        });
+      }, 1000) as unknown as number;
+    }
+    return () => clearInterval(timer);
+  }, [gameActive, isPaused, score]);
+
+  // 开始游戏
+  const startGame = () => {
+    setScore(0);
+    setGameActive(true);
+    setIsPaused(false);
+    setTimeLeft(config.totalTime);
+    setMoles(Array(9).fill(false));
+    setWhackedMoles(Array(9).fill(false));
+    setShowEndConfirm(false);
+    setShowGameOver(false);
   };
 
+  // 结束游戏
   const endGame = () => {
     setGameActive(false);
     setIsPaused(false);
     setTimeLeft(config.totalTime);
     setScore(0);
-    setActiveMoles([]);
-    setWhackedMole(-1);
+    setMoles(Array(9).fill(false));
+    setWhackedMoles(Array(9).fill(false));
+    setShowEndConfirm(false);
+    setShowGameOver(false);
   };
 
+  // 处理结束游戏按钮点击
   const handleEndGameClick = () => {
-    setShowConfirmEndGame(true);
+    if (gameActive) {
+      setIsPaused(true);
+      setShowEndConfirm(true);
+    }
   };
 
+  // 确认结束游戏
   const handleConfirmEndGame = () => {
-    setShowConfirmEndGame(false);
+    setShowEndConfirm(false);
     endGame();
   };
 
+  // 取消结束游戏
   const handleCancelEndGame = () => {
-    setShowConfirmEndGame(false);
+    setShowEndConfirm(false);
+    setIsPaused(false);
   };
 
   return (
     <GameContainer>
-      <GithubLink 
-        href="https://github.com/mhxy13867806343/react-hooks.-vite-Groundhopping" 
-        target="_blank"
-        rel="noopener noreferrer"
-      >
-        <svg viewBox="0 0 24 24">
-          <path d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z"/>
-        </svg>
-        GitHub
-      </GithubLink>
-
-      <StyledSettingsButton
-        type="text"
-        icon={<SettingOutlined />}
-        onClick={handleOpenSettings}
-      >
-        {translations[config.language].settings}
-      </StyledSettingsButton>
-
-      {gameActive && <ProgressBar progress={calculateProgress()} />}
-      
-      <h1 style={{ color: '#fff', textShadow: '2px 2px 4px rgba(0,0,0,0.3)' }}>
+      <h1>
         {translations[config.language].title}
       </h1>
       
-
-
       <ScoreBoard>
         {translations[config.language].score}: {score} | {translations[config.language].highScore}: {highScore} | {translations[config.language].timeLeft}: {Math.floor(timeLeft / 60)}:{(timeLeft % 60).toString().padStart(2, '0')}
-        {gameActive && <div style={{ fontSize: '18px' }}>{translations[config.language].pressSpaceOrClick}</div>}
-        {isPaused && <div style={{ color: '#ff6b6b' }}>{translations[config.language].gamePaused}</div>}
       </ScoreBoard>
 
       <Button
-        onClick={startGame}
+        onClick={gameActive ? handleEndGameClick : startGame}
         disabled={gameActive && !isPaused}
         style={{ margin: '20px 0' }}
       >
         {gameActive 
-          ? (isPaused ? translations[config.language].resumeGame : translations[config.language].gameInProgress) 
+          ? (isPaused ? translations[config.language].resumeGame : translations[config.language].endGame)
           : translations[config.language].startGame}
       </Button>
 
@@ -679,21 +726,19 @@ const App: React.FC = () => {
         {Array(9).fill(null).map((_, index) => (
           <HoleContainer key={index} onClick={() => whackMole(index)}>
             <Mole 
-              active={activeMoles.includes(index)}
-              className={whackedMole === index ? 'whacked' : ''}
+              active={moles[index]}
+              className={whackedMoles[index] ? 'whacked' : ''}
             />
           </HoleContainer>
         ))}
       </Grid>
 
-      {isPaused && gameActive && (
+      {/* 暂停界面 */}
+      {isPaused && !showEndConfirm && (
         <PauseOverlay>
           <h2>{translations[config.language].gamePaused}</h2>
           <p>{translations[config.language].currentScore}</p>
           <div className="score-display">{score}</div>
-          <div className="time-display">
-            {translations[config.language].timeLeft}: {Math.floor(timeLeft / 60)}:{(timeLeft % 60).toString().padStart(2, '0')}
-          </div>
           <p>{translations[config.language].pressSpaceOrClick}</p>
           <ButtonGroup>
             <ResumeButton onClick={() => setIsPaused(false)}>
@@ -706,7 +751,8 @@ const App: React.FC = () => {
         </PauseOverlay>
       )}
 
-      {showConfirmEndGame && (
+      {/* 确认结束游戏弹窗 */}
+      {showEndConfirm && (
         <ConfirmModal>
           <div className="content">
             <h3>{translations[config.language].confirmEnd}</h3>
@@ -723,13 +769,18 @@ const App: React.FC = () => {
         </ConfirmModal>
       )}
 
-      {showEndModal && (
+      {/* 游戏设置弹窗 */}
+      {renderSettingsModal()}
+
+      {/* 游戏结束弹窗 */}
+      {showGameOver && (
         <Modal>
           <ModalContent>
             <h2>{translations[config.language].gameOver}</h2>
             <div className="score">{score}</div>
-            <div className="high-score">{translations[config.language].highScore}: {highScore}</div>
-            <p>{score > highScore ? translations[config.language].newRecord : translations[config.language].keepTrying}</p>
+            <div className="high-score">
+              {score > highScore ? translations[config.language].newRecord : translations[config.language].keepTrying}
+            </div>
             <Button onClick={startGame}>
               {translations[config.language].playAgain}
             </Button>
@@ -737,65 +788,25 @@ const App: React.FC = () => {
         </Modal>
       )}
 
-      <AntModal
-        title={translations[config.language].gameSettings}
-        open={showSettings}
-        onCancel={handleCloseSettings}
-        footer={[
-          <AntButton key="cancel" onClick={handleCloseSettings}>
-            {translations[config.language].cancel}
-          </AntButton>,
-          <AntButton key="save" type="primary" onClick={handleSaveSettings}>
-            {translations[config.language].save}
-          </AntButton>
-        ]}
+      <GithubLink
+        href="https://github.com/your-username/whack-a-mole"
+        target="_blank"
+        rel="noopener noreferrer"
       >
-        <Space direction="vertical" style={{ width: '100%' }} size="large">
-          <div>
-            <div style={{ marginBottom: 8 }}>{translations[config.language].language}</div>
-            <Select
-              style={{ width: '100%' }}
-              value={config.language}
-              onChange={value => handleConfigChange('language', value)}
-              options={[
-                { value: 'zh', label: '中文' },
-                { value: 'en', label: 'English' }
-              ]}
-            />
-          </div>
-          <div>
-            <div style={{ marginBottom: 8 }}>{translations[config.language].totalTime}</div>
-            <input 
-              type="number" 
-              value={config.totalTime}
-              onChange={e => handleConfigChange('totalTime', parseInt(e.target.value) || MIN_TIME)}
-              min={MIN_TIME}
-              max={MAX_TIME}
-              style={{ width: '100%', padding: '4px 11px', borderRadius: 6, border: '1px solid #d9d9d9' }}
-            />
-            <div style={{ fontSize: '12px', color: 'rgba(0,0,0,0.45)', marginTop: 4 }}>
-              {Math.floor(config.totalTime / 60)}{translations[config.language].minutes}{config.totalTime % 60}{translations[config.language].seconds}
-            </div>
-          </div>
-          <div>
-            <div style={{ marginBottom: 8 }}>{translations[config.language].maxMoles}</div>
-            <input 
-              type="number" 
-              value={config.maxMoles}
-              onChange={e => handleConfigChange('maxMoles', parseInt(e.target.value) || MIN_MOLES)}
-              min={MIN_MOLES}
-              max={MAX_MOLES}
-              style={{ width: '100%', padding: '4px 11px', borderRadius: 6, border: '1px solid #d9d9d9' }}
-            />
-            <div style={{ fontSize: '12px', color: 'rgba(0,0,0,0.45)', marginTop: 4 }}>
-              {translations[config.language].suggestedAmount}: {calculateMolesFromTime(config.totalTime)}
-            </div>
-          </div>
-        </Space>
-      </AntModal>
+        <svg viewBox="0 0 16 16">
+          <path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"/>
+        </svg>
+        GitHub
+      </GithubLink>
+
+      <StyledSettingsButton
+        icon={<SettingOutlined />}
+        onClick={() => setShowSettings(true)}
+      >
+        {translations[config.language].settings}
+      </StyledSettingsButton>
     </GameContainer>
   );
-
 };
 
 export default App;
