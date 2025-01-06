@@ -526,6 +526,24 @@ const ScoreGrade = styled.div<{ score: number }>`
   font-weight: bold;
 `;
 
+const GameTitle = styled.h1`
+  font-size: 2.5em;
+  color: #fff;
+  text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.5);
+  margin-bottom: 20px;
+  animation: slideTitle 3s linear infinite;
+  white-space: nowrap;
+
+  @keyframes slideTitle {
+    0% {
+      transform: translateX(-100%);
+    }
+    100% {
+      transform: translateX(100%);
+    }
+  }
+`;
+
 const App: React.FC = () => {
   const [score, setScore] = useState(0);
   const [gameActive, setGameActive] = useState(false);
@@ -945,10 +963,11 @@ const App: React.FC = () => {
   return (
     <GameContainer>
       <ProgressBar progress={(1 - timeLeft / config.totalTime) * 100} />
-      <h1>
-        {translations[config.language].title}
-      </h1>
       
+      <GameTitle>
+        {translations[config.language].title}
+      </GameTitle>
+
       <ScoreBoard>
         {translations[config.language].score}: {score} | {translations[config.language].highScore}: {highScore} | {translations[config.language].timeLeft}:{' '}
         <TimeText isLow={timeLeft < 10}>
