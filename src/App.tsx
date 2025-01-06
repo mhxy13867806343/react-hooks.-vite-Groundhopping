@@ -655,13 +655,7 @@ const App: React.FC = () => {
     // 防止重复点击
     if (clickTimeoutRef.current[index]) return;
 
-    // 根据剩余时间计算分数
-    const timeProgress = 1 - timeLeft / config.totalTime;
-    const baseScore = 10;
-    const bonusScore = Math.floor(timeProgress * 20); // 最多额外得20分
-    const totalScore = baseScore + bonusScore;
-
-    setScore(prev => prev + totalScore);
+    setScore(prev => prev + 1);  // 每次打中加1分
     setWhackedMoles(prev => {
       const newWhacked = [...prev];
       newWhacked[index] = true;
@@ -679,7 +673,7 @@ const App: React.FC = () => {
       });
       delete clickTimeoutRef.current[index];
     }, 300);
-  }, [gameActive, isPaused, moles, whackedMoles, timeLeft, config.totalTime, playHitSound]);
+  }, [gameActive, isPaused, moles, whackedMoles, playHitSound]);
 
   // 开始游戏
   const startGame = useCallback(() => {
