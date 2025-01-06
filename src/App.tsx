@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import styled from '@emotion/styled';
-import { keyframes } from '@emotion/react';
+import { keyframes, css } from '@emotion/react';
 import { Button as AntButton, Modal as AntModal, Select, Space } from 'antd';
 import { SettingOutlined } from '@ant-design/icons';
 import { useGameSettings } from './hooks/useGameSettings';
@@ -245,6 +245,22 @@ const whackAnimation = keyframes`
   100% { transform: scale(1) rotate(0deg); }
 `;
 
+const pulseAnimation = keyframes`
+  0% {
+    transform: scale(1);
+    color: #ff4d4f;
+  }
+  50% {
+    transform: scale(1.2);
+    color: #ff1f1f;
+    text-shadow: 0 0 10px rgba(255, 77, 79, 0.5);
+  }
+  100% {
+    transform: scale(1);
+    color: #ff4d4f;
+  }
+`;
+
 const HoleContainer = styled.div`
   position: relative;
   width: 100%;
@@ -282,6 +298,14 @@ const ScoreBoard = styled.div`
   padding: 10px 20px;
   border-radius: 10px;
   display: inline-block;
+`;
+
+const TimeText = styled.span<{ isLow: boolean }>`
+  ${props => props.isLow && css`
+    display: inline-block;
+    animation: ${pulseAnimation} 0.8s ease-in-out infinite;
+    padding: 0 5px;
+  `}
 `;
 
 const Button = styled.button`
@@ -759,7 +783,10 @@ const App: React.FC = () => {
       </h1>
       
       <ScoreBoard>
-        {translations[config.language].score}: {score} | {translations[config.language].highScore}: {highScore} | {translations[config.language].timeLeft}: {Math.floor(timeLeft / 60)}:{(timeLeft % 60).toString().padStart(2, '0')}
+        {translations[config.language].score}: {score} | {translations[config.language].highScore}: {highScore} | {translations[config.language].timeLeft}:{' '}
+        <TimeText isLow={timeLeft < 10}>
+          {Math.floor(timeLeft / 60)}:{(timeLeft % 60).toString().padStart(2, '0')}
+        </TimeText>
       </ScoreBoard>
 
       <Button
