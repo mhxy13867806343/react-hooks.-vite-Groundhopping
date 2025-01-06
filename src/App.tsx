@@ -15,7 +15,7 @@ interface GameConfig {
   maxMoles: number;
   initialSpeed: number;
   minSpeed: number;
-  language: 'zh' | 'en';
+  language: string;
 }
 
 const MAX_TIME = 120; // 最大时间 2分钟
@@ -36,12 +36,13 @@ const calculateTimeFromMoles = (moles: number): number => {
   return Math.min(Math.max(seconds, MIN_TIME), MAX_TIME);
 };
 
-const defaultConfig: GameConfig = {
-  totalTime: 60,
-  maxMoles: 5,
-  initialSpeed: 1000,
-  minSpeed: 400,
-  language: 'zh'
+// 默认设置
+const defaultSettings: GameConfig = {
+  totalTime: 100,  // 总时间（秒）
+  maxMoles: 5,     // 最大地鼠数量
+  initialSpeed: 2000, // 初始速度（毫秒）
+  minSpeed: 500,   // 最小速度（毫秒）
+  language: 'zh'   // 默认语言
 };
 
 const translations = {
@@ -525,10 +526,41 @@ const App: React.FC = () => {
   const [showEndConfirm, setShowEndConfirm] = useState(false);
   const [showGameOver, setShowGameOver] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
-  const { settings, saveSettings } = useGameSettings();
+  const { settings, saveSettings } = useGameSettings(defaultSettings);
   const [config, setConfig] = useState<GameConfig>(settings);
   const [tempConfig, setTempConfig] = useState<GameConfig>(settings);
   const [isMuted, setIsMuted] = useState(false);
+
+  const bgmRef = useRef<HTMLAudioElement | null>(null);
+  const gameoverRef = useRef<HTMLAudioElement | null>(null);
+
+  // 初始化音频
+  useEffect(() => {
+    bgmRef.current = new Audio(bgmSoundUrl);
+    bgmRef.current.loop = true;
+    bgmRef.current.volume = 0.3;
+
+    gameoverRef.current = new Audio(gameoverSoundUrl);
+    gameoverRef.current.volume = 0.5;
+
+    return () => {
+      if (bgmRef.current) {
+        bgmRef.current.pause();
+        bgmRef.current = null;
+      }
+      if (gameoverRef.current) {
+        gameoverRef.current.pause();
+        gameoverRef.current = null;
+      }
+    };
+  }, []);
+
+  // 监听静音状态
+  useEffect(() => {
+    if (bgmRef.current) {
+      bgmRef.current.volume = isMuted ? 0 : 0.3;
+    }
+  }, [isMuted]);
 
   // 创建音效函数
   const playHitSound = useCallback(() => {
@@ -587,12 +619,30 @@ const App: React.FC = () => {
     setMoles(Array(9).fill(false));
     setWhackedMoles(Array(9).fill(false));
     setShowGameOver(false);
-  }, [config.totalTime]);
+    
+    // 播放背景音乐
+    if (bgmRef.current && !isMuted) {
+      bgmRef.current.currentTime = 0;
+      bgmRef.current.play().catch(console.error);
+    }
+  }, [config.totalTime, isMuted]);
 
   // 结束游戏
   const endGame = useCallback(() => {
     setGameActive(false);
     setShowGameOver(true);
+    
+    // 停止背景音乐，播放游戏结束音效
+    if (bgmRef.current) {
+      bgmRef.current.pause();
+      bgmRef.current.currentTime = 0;
+    }
+    
+    if (gameoverRef.current && !isMuted) {
+      gameoverRef.current.currentTime = 0;
+      gameoverRef.current.play().catch(console.error);
+    }
+
     if (score > highScore) {
       setHighScore(score);
     }
@@ -600,12 +650,21 @@ const App: React.FC = () => {
     // 清理所有计时器
     Object.values(clickTimeoutRef.current).forEach(clearTimeout);
     clickTimeoutRef.current = {};
-  }, [score, highScore]);
+  }, [score, highScore, isMuted]);
 
   // 处理设置的保存
   const handleSaveSettings = () => {
-    saveSettings(tempConfig);
+    // 保存设置
+    setConfig({
+      ...tempConfig,
+      totalTime: Number(tempConfig.totalTime), // 确保转换为数字
+    });
+    // 关闭设置弹窗
     setShowSettings(false);
+    // 如果游戏正在进行，更新剩余时间
+    if (gameActive) {
+      setTimeLeft(Number(tempConfig.totalTime));
+    }
   };
 
   // 处理设置的取消
@@ -641,7 +700,7 @@ const App: React.FC = () => {
           <Select
             value={tempConfig.language}
             style={{ width: '100%' }}
-            onChange={(value: 'zh' | 'en') => setTempConfig(prev => ({ ...prev, language: value }))}
+            onChange={(value: string) => setTempConfig(prev => ({ ...prev, language: value }))}
             options={[
               { value: 'zh', label: '中文' },
               { value: 'en', label: 'English' }
@@ -723,21 +782,20 @@ const App: React.FC = () => {
   // 游戏计时器
   useEffect(() => {
     let timer: number;
-    if (gameActive && !isPaused) {
-      timer = setInterval(() => {
+    if (gameActive && !isPaused && timeLeft > 0) {
+      timer = window.setInterval(() => {
         setTimeLeft(prev => {
-          if (prev <= 1) {
-            setGameActive(false);
-            setHighScore(current => Math.max(current, score));
-            setShowGameOver(true);
+          if (prev <= 0) {
+            clearInterval(timer);
+            endGame();
             return 0;
           }
           return prev - 1;
         });
-      }, 1000) as unknown as number;
+      }, 1000);
     }
     return () => clearInterval(timer);
-  }, [gameActive, isPaused, score]);
+  }, [gameActive, isPaused, endGame]);
 
   // 处理结束游戏按钮点击
   const handleEndGameClick = () => {
@@ -832,6 +890,11 @@ const App: React.FC = () => {
   }, [moles, whackedMoles]);
 
   const clickTimeoutRef = useRef({});
+
+  // 监听配置变化
+  useEffect(() => {
+    setTempConfig(config);
+  }, [config]);
 
   return (
     <GameContainer>
