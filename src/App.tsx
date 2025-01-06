@@ -671,7 +671,15 @@ const App: React.FC = () => {
     // 防止重复点击
     if (clickTimeoutRef.current[index]) return;
 
-    setScore(prev => prev + 1);
+    // 更新分数
+    const newScore = score + 1;
+    setScore(newScore);
+    
+    // 实时更新最高分
+    if (newScore > highScore) {
+      setHighScore(newScore);
+    }
+
     setWhackedMoles(prev => {
       const newWhacked = [...prev];
       newWhacked[index] = true;
@@ -695,7 +703,7 @@ const App: React.FC = () => {
       });
       delete clickTimeoutRef.current[index];
     }, 300);
-  }, [gameActive, isPaused, moles, whackedMoles, playHitSound]);
+  }, [gameActive, isPaused, moles, whackedMoles, playHitSound, score, highScore]);
 
   // 开始游戏时重置所有状态
   const startGame = useCallback(() => {
@@ -901,6 +909,10 @@ const App: React.FC = () => {
 
   // 处理结束游戏按钮点击
   const handleEndGameClick = () => {
+    // 更新最高分
+    if (score > highScore) {
+      setHighScore(score);
+    }
     resetGameState();
   };
 
