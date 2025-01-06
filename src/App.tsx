@@ -73,7 +73,8 @@ const translations = {
     tryAgain: '再试一次',
     backToMenu: '返回菜单',
     finalScore: '最终得分',
-    newHighScore: '新高分！'
+    newHighScore: '新高分！',
+    exitGame: '退出游戏'
   },
   en: {
     title: 'Whack-a-Mole',
@@ -107,7 +108,8 @@ const translations = {
     tryAgain: 'Try Again',
     backToMenu: 'Back to Menu',
     finalScore: 'Final Score',
-    newHighScore: 'New High Score!'
+    newHighScore: 'New High Score!',
+    exitGame: 'Exit Game'
   }
 };
 
@@ -436,6 +438,7 @@ const ResumeButton = styled(Button)`
 const ButtonGroup = styled.div`
   display: flex;
   gap: 20px;
+  justify-content: center;
   margin-top: 20px;
 `;
 
@@ -518,6 +521,7 @@ const App: React.FC = () => {
   const [showEndConfirm, setShowEndConfirm] = useState(false);
   const [showGameOver, setShowGameOver] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
+  const [showExitConfirm, setShowExitConfirm] = useState(false);
   const { settings, saveSettings } = useGameSettings();
   const [config, setConfig] = useState<GameConfig>(settings);
   const [tempConfig, setTempConfig] = useState<GameConfig>(settings);
@@ -776,6 +780,22 @@ const App: React.FC = () => {
     return '别灰心，再试一次！';
   };
 
+  // 退出游戏
+  const handleExitClick = () => {
+    setShowExitConfirm(true);
+  };
+
+  // 确认退出
+  const confirmExit = () => {
+    setShowExitConfirm(false);
+    setShowGameOver(false);
+    setGameActive(false);
+    setTimeLeft(0);
+    setScore(0);
+    setMoles(Array(9).fill(false));
+    setWhackedMoles(Array(9).fill(false));
+  };
+
   return (
     <GameContainer>
       <h1>
@@ -866,11 +886,34 @@ const App: React.FC = () => {
                 {translations[config.language].newHighScore}!
               </p>
             )}
-            <Button onClick={startGame}>
-              {translations[config.language].playAgain}
-            </Button>
+            <ButtonGroup>
+              <Button onClick={startGame}>
+                {translations[config.language].tryAgain}
+              </Button>
+              <Button onClick={handleExitClick} style={{ backgroundColor: '#ff4d4f' }}>
+                {translations[config.language].exitGame}
+              </Button>
+            </ButtonGroup>
           </ModalContent>
         </Modal>
+      )}
+
+      {/* 确认退出弹窗 */}
+      {showExitConfirm && (
+        <ConfirmModal>
+          <div className="content">
+            <h3>{translations[config.language].confirmEnd}</h3>
+            <p>{translations[config.language].confirmEndDesc}</p>
+            <div className="button-group">
+              <button className="cancel" onClick={() => setShowExitConfirm(false)}>
+                {translations[config.language].cancel}
+              </button>
+              <button className="confirm" onClick={confirmExit}>
+                {translations[config.language].confirm}
+              </button>
+            </div>
+          </div>
+        </ConfirmModal>
       )}
 
       <GithubLink
