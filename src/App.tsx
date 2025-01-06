@@ -1,6 +1,8 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import styled from '@emotion/styled';
 import { keyframes } from '@emotion/react';
+import { Button as AntButton, Modal as AntModal, Select, Space } from 'antd';
+import { SettingOutlined } from '@ant-design/icons';
 
 // 游戏配置接口
 interface GameConfig {
@@ -8,6 +10,7 @@ interface GameConfig {
   maxMoles: number;
   initialSpeed: number;
   minSpeed: number;
+  language: 'zh' | 'en';
 }
 
 const MAX_TIME = 120; // 最大时间 2分钟
@@ -33,6 +36,70 @@ const defaultConfig: GameConfig = {
   maxMoles: 5,
   initialSpeed: 1000,
   minSpeed: 400,
+  language: 'zh'
+};
+
+const translations = {
+  zh: {
+    title: '打地鼠游戏',
+    score: '分数',
+    highScore: '最高分',
+    timeLeft: '剩余时间',
+    startGame: '开始游戏',
+    gameInProgress: '游戏进行中...',
+    resumeGame: '继续游戏',
+    endGame: '结束游戏',
+    settings: '设置',
+    gamePaused: '游戏暂停',
+    currentScore: '当前得分',
+    pressSpaceOrClick: '按空格键或点击下方按钮继续游戏',
+    confirmEnd: '确认结束游戏？',
+    confirmEndDesc: '当前进度将不会保存，确定要结束当前游戏吗？',
+    cancel: '取消',
+    confirm: '确认结束',
+    gameSettings: '游戏设置',
+    totalTime: '总时间 (秒)',
+    maxMoles: '最大地鼠数量',
+    suggestedAmount: '建议数量',
+    save: '保存',
+    minutes: '分',
+    seconds: '秒',
+    gameOver: '游戏结束！',
+    newRecord: '新纪录！🎉',
+    keepTrying: '继续加油！💪',
+    playAgain: '再来一局',
+    language: '语言'
+  },
+  en: {
+    title: 'Whack-a-Mole',
+    score: 'Score',
+    highScore: 'High Score',
+    timeLeft: 'Time Left',
+    startGame: 'Start Game',
+    gameInProgress: 'Game in Progress...',
+    resumeGame: 'Resume Game',
+    endGame: 'End Game',
+    settings: 'Settings',
+    gamePaused: 'Game Paused',
+    currentScore: 'Current Score',
+    pressSpaceOrClick: 'Press Space or Click Button Below to Resume',
+    confirmEnd: 'Confirm End Game?',
+    confirmEndDesc: 'Current progress will not be saved. Are you sure you want to end the game?',
+    cancel: 'Cancel',
+    confirm: 'Confirm',
+    gameSettings: 'Game Settings',
+    totalTime: 'Total Time (seconds)',
+    maxMoles: 'Max Moles',
+    suggestedAmount: 'Suggested Amount',
+    save: 'Save',
+    minutes: 'min',
+    seconds: 'sec',
+    gameOver: 'Game Over!',
+    newRecord: 'New Record! 🎉',
+    keepTrying: 'Keep Going! 💪',
+    playAgain: 'Play Again',
+    language: 'Language'
+  }
 };
 
 const GameContainer = styled.div`
@@ -70,6 +137,26 @@ const GithubLink = styled.a`
     width: 20px;
     height: 20px;
     fill: currentColor;
+  }
+`;
+
+const StyledSettingsButton = styled(AntButton)`
+  position: absolute;
+  top: 20px;
+  right: 100px;
+  padding: 8px 15px;
+  background: rgba(255, 255, 255, 0.2);
+  backdrop-filter: blur(5px);
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  
+  &:hover {
+    background: rgba(255, 255, 255, 0.3);
+  }
+
+  svg {
+    width: 20px;
+    height: 20px;
+    margin-right: 5px;
   }
 `;
 
@@ -382,14 +469,15 @@ const ConfirmModal = styled(Modal)`
 const App: React.FC = () => {
   const [score, setScore] = useState(0);
   const [gameActive, setGameActive] = useState(false);
-  const [isPaused, setIsPaused] = useState(false);
   const [timeLeft, setTimeLeft] = useState(defaultConfig.totalTime);
   const [activeMoles, setActiveMoles] = useState<number[]>([]);
-  const [highScore, setHighScore] = useState(0);
   const [whackedMole, setWhackedMole] = useState<number | null>(null);
+  const [highScore, setHighScore] = useState(0);
+  const [isPaused, setIsPaused] = useState(false);
   const [showEndModal, setShowEndModal] = useState(false);
   const [config, setConfig] = useState<GameConfig>(defaultConfig);
   const [showConfirmEndGame, setShowConfirmEndGame] = useState(false);
+  const [showSettings, setShowSettings] = useState(false);
 
   // 处理空格键暂停
   useEffect(() => {
@@ -462,26 +550,40 @@ const App: React.FC = () => {
     setShowEndModal(false);
   };
 
-  const handleConfigChange = (key: keyof GameConfig, value: number) => {
+  const handleConfigChange = (key: keyof GameConfig, value: number | 'zh' | 'en') => {
     if (key === 'totalTime') {
       // 时间改变，自动调整地鼠数量
-      const newTime = Math.min(Math.max(value, MIN_TIME), MAX_TIME);
+      const newTime = Math.min(Math.max(value as number, MIN_TIME), MAX_TIME);
       const newMoles = calculateMolesFromTime(newTime);
       setConfig(prev => ({
         ...prev,
-        totalTime: newTime,
+        [key]: newTime,
         maxMoles: newMoles
       }));
     } else if (key === 'maxMoles') {
       // 地鼠数量改变，自动调整时间
-      const newMoles = Math.min(Math.max(value, MIN_MOLES), MAX_MOLES);
+      const newMoles = Math.min(Math.max(value as number, MIN_MOLES), MAX_MOLES);
       const newTime = calculateTimeFromMoles(newMoles);
       setConfig(prev => ({
         ...prev,
-        maxMoles: newMoles,
+        [key]: newMoles,
         totalTime: newTime
       }));
+    } else if (key === 'language') {
+      setConfig(prev => ({ ...prev, [key]: value }));
     }
+  };
+
+  const handleOpenSettings = () => {
+    setShowSettings(true);
+  };
+
+  const handleCloseSettings = () => {
+    setShowSettings(false);
+  };
+
+  const handleSaveSettings = () => {
+    setShowSettings(false);
   };
 
   const whackMole = (index: number) => {
@@ -541,47 +643,26 @@ const App: React.FC = () => {
         GitHub
       </GithubLink>
 
+      <StyledSettingsButton
+        type="text"
+        icon={<SettingOutlined />}
+        onClick={handleOpenSettings}
+      >
+        {translations[config.language].settings}
+      </StyledSettingsButton>
+
       {gameActive && <ProgressBar progress={calculateProgress()} />}
       
       <h1 style={{ color: '#fff', textShadow: '2px 2px 4px rgba(0,0,0,0.3)' }}>
-        打地鼠游戏
+        {translations[config.language].title}
       </h1>
       
-      {!gameActive && (
-        <ConfigPanel>
-          <label>
-            总时间 (秒)
-            <input 
-              type="number" 
-              value={config.totalTime}
-              onChange={e => handleConfigChange('totalTime', parseInt(e.target.value) || MIN_TIME)}
-              min={MIN_TIME}
-              max={MAX_TIME}
-            />
-            <div style={{ fontSize: '12px', color: '#fff' }}>
-              {Math.floor(config.totalTime / 60)}分{config.totalTime % 60}秒
-            </div>
-          </label>
-          <label>
-            最大地鼠数量
-            <input 
-              type="number" 
-              value={config.maxMoles}
-              onChange={e => handleConfigChange('maxMoles', parseInt(e.target.value) || MIN_MOLES)}
-              min={MIN_MOLES}
-              max={MAX_MOLES}
-            />
-            <div style={{ fontSize: '12px', color: '#fff' }}>
-              建议数量: {calculateMolesFromTime(config.totalTime)}
-            </div>
-          </label>
-        </ConfigPanel>
-      )}
+
 
       <ScoreBoard>
-        分数: {score} | 最高分: {highScore} | 剩余时间: {Math.floor(timeLeft / 60)}:{(timeLeft % 60).toString().padStart(2, '0')}
-        {gameActive && <div style={{ fontSize: '18px' }}>按空格键暂停/继续</div>}
-        {isPaused && <div style={{ color: '#ff6b6b' }}>已暂停</div>}
+        {translations[config.language].score}: {score} | {translations[config.language].highScore}: {highScore} | {translations[config.language].timeLeft}: {Math.floor(timeLeft / 60)}:{(timeLeft % 60).toString().padStart(2, '0')}
+        {gameActive && <div style={{ fontSize: '18px' }}>{translations[config.language].pressSpaceOrClick}</div>}
+        {isPaused && <div style={{ color: '#ff6b6b' }}>{translations[config.language].gamePaused}</div>}
       </ScoreBoard>
 
       <Button
@@ -590,8 +671,8 @@ const App: React.FC = () => {
         style={{ margin: '20px 0' }}
       >
         {gameActive 
-          ? (isPaused ? '继续游戏' : '游戏进行中...') 
-          : '开始游戏'}
+          ? (isPaused ? translations[config.language].resumeGame : translations[config.language].gameInProgress) 
+          : translations[config.language].startGame}
       </Button>
 
       <Grid>
@@ -607,19 +688,19 @@ const App: React.FC = () => {
 
       {isPaused && gameActive && (
         <PauseOverlay>
-          <h2>游戏暂停</h2>
-          <p>当前得分</p>
+          <h2>{translations[config.language].gamePaused}</h2>
+          <p>{translations[config.language].currentScore}</p>
           <div className="score-display">{score}</div>
           <div className="time-display">
-            剩余时间: {Math.floor(timeLeft / 60)}:{(timeLeft % 60).toString().padStart(2, '0')}
+            {translations[config.language].timeLeft}: {Math.floor(timeLeft / 60)}:{(timeLeft % 60).toString().padStart(2, '0')}
           </div>
-          <p>按空格键或点击下方按钮继续游戏</p>
+          <p>{translations[config.language].pressSpaceOrClick}</p>
           <ButtonGroup>
             <ResumeButton onClick={() => setIsPaused(false)}>
-              继续游戏
+              {translations[config.language].resumeGame}
             </ResumeButton>
             <EndGameButton onClick={handleEndGameClick}>
-              结束游戏
+              {translations[config.language].endGame}
             </EndGameButton>
           </ButtonGroup>
         </PauseOverlay>
@@ -628,14 +709,14 @@ const App: React.FC = () => {
       {showConfirmEndGame && (
         <ConfirmModal>
           <div className="content">
-            <h3>确认结束游戏？</h3>
-            <p>当前进度将不会保存，确定要结束当前游戏吗？</p>
+            <h3>{translations[config.language].confirmEnd}</h3>
+            <p>{translations[config.language].confirmEndDesc}</p>
             <div className="button-group">
               <button className="cancel" onClick={handleCancelEndGame}>
-                取消
+                {translations[config.language].cancel}
               </button>
               <button className="confirm" onClick={handleConfirmEndGame}>
-                确认结束
+                {translations[config.language].confirm}
               </button>
             </div>
           </div>
@@ -645,16 +726,73 @@ const App: React.FC = () => {
       {showEndModal && (
         <Modal>
           <ModalContent>
-            <h2>游戏结束！</h2>
-            <div className="score">{score}分</div>
-            <div className="high-score">最高分: {highScore}</div>
-            <p>{score > highScore ? '新纪录！🎉' : '继续加油！💪'}</p>
+            <h2>{translations[config.language].gameOver}</h2>
+            <div className="score">{score}</div>
+            <div className="high-score">{translations[config.language].highScore}: {highScore}</div>
+            <p>{score > highScore ? translations[config.language].newRecord : translations[config.language].keepTrying}</p>
             <Button onClick={startGame}>
-              再来一局
+              {translations[config.language].playAgain}
             </Button>
           </ModalContent>
         </Modal>
       )}
+
+      <AntModal
+        title={translations[config.language].gameSettings}
+        open={showSettings}
+        onCancel={handleCloseSettings}
+        footer={[
+          <AntButton key="cancel" onClick={handleCloseSettings}>
+            {translations[config.language].cancel}
+          </AntButton>,
+          <AntButton key="save" type="primary" onClick={handleSaveSettings}>
+            {translations[config.language].save}
+          </AntButton>
+        ]}
+      >
+        <Space direction="vertical" style={{ width: '100%' }} size="large">
+          <div>
+            <div style={{ marginBottom: 8 }}>{translations[config.language].language}</div>
+            <Select
+              style={{ width: '100%' }}
+              value={config.language}
+              onChange={value => handleConfigChange('language', value)}
+              options={[
+                { value: 'zh', label: '中文' },
+                { value: 'en', label: 'English' }
+              ]}
+            />
+          </div>
+          <div>
+            <div style={{ marginBottom: 8 }}>{translations[config.language].totalTime}</div>
+            <input 
+              type="number" 
+              value={config.totalTime}
+              onChange={e => handleConfigChange('totalTime', parseInt(e.target.value) || MIN_TIME)}
+              min={MIN_TIME}
+              max={MAX_TIME}
+              style={{ width: '100%', padding: '4px 11px', borderRadius: 6, border: '1px solid #d9d9d9' }}
+            />
+            <div style={{ fontSize: '12px', color: 'rgba(0,0,0,0.45)', marginTop: 4 }}>
+              {Math.floor(config.totalTime / 60)}{translations[config.language].minutes}{config.totalTime % 60}{translations[config.language].seconds}
+            </div>
+          </div>
+          <div>
+            <div style={{ marginBottom: 8 }}>{translations[config.language].maxMoles}</div>
+            <input 
+              type="number" 
+              value={config.maxMoles}
+              onChange={e => handleConfigChange('maxMoles', parseInt(e.target.value) || MIN_MOLES)}
+              min={MIN_MOLES}
+              max={MAX_MOLES}
+              style={{ width: '100%', padding: '4px 11px', borderRadius: 6, border: '1px solid #d9d9d9' }}
+            />
+            <div style={{ fontSize: '12px', color: 'rgba(0,0,0,0.45)', marginTop: 4 }}>
+              {translations[config.language].suggestedAmount}: {calculateMolesFromTime(config.totalTime)}
+            </div>
+          </div>
+        </Space>
+      </AntModal>
     </GameContainer>
   );
 
