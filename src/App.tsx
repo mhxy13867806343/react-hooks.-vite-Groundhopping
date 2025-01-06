@@ -4,7 +4,7 @@ import { keyframes, css } from '@emotion/react';
 import { Button as AntButton, Modal as AntModal, Select, Space } from 'antd';
 import { SettingOutlined } from '@ant-design/icons';
 import { useGameSettings } from './hooks/useGameSettings';
-import moleImage from '../public/ds.jpg';
+import moleImage from './assets/ds.jpg';
 
 const hitSoundUrl = 'https://assets.mixkit.co/active_storage/sfx/2571/2571-preview.mp3';
 const bgmSoundUrl = 'https://assets.mixkit.co/active_storage/sfx/123/123-preview.mp3';
