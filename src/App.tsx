@@ -605,27 +605,42 @@ const App: React.FC = () => {
   }, [timeLeft, config.totalTime]);
 
   // 随机显示地鼠
+  const lastMolePositionsRef = useRef<number[]>([]);  // 记录最近出现地鼠的位置
   const showRandomMoles = useCallback(() => {
     const targetMoleCount = calculateMoleCount();
     const currentMoleCount = moles.filter(m => m).length;
     
     if (currentMoleCount >= targetMoleCount) return;
 
-    const availableHoles = moles.reduce((acc, mole, index) => {
-      if (!mole && !whackedMoles[index]) acc.push(index);
-      return acc;
-    }, [] as number[]);
+    // 获取所有可用的位置（排除最近使用过的位置）
+    const availableHoles = Array.from({ length: 9 }, (_, i) => i).filter(index => 
+      !moles[index] && 
+      !whackedMoles[index] && 
+      !lastMolePositionsRef.current.includes(index)
+    );
 
-    if (availableHoles.length === 0) return;
+    if (availableHoles.length === 0) {
+      // 如果没有可用位置，清空历史记录
+      lastMolePositionsRef.current = [];
+      return;
+    }
 
     const numNewMoles = Math.min(
       targetMoleCount - currentMoleCount,
-      Math.floor(Math.random() * 3) + 1 // 每次随机添加1-3个地鼠
+      Math.floor(Math.random() * 2) + 1, // 每次随机添加1-2个地鼠
+      availableHoles.length // 不超过可用位置数量
     );
 
+    // 随机选择新的位置
     const newMoleIndices = availableHoles
       .sort(() => Math.random() - 0.5)
       .slice(0, numNewMoles);
+
+    // 记录新的位置
+    lastMolePositionsRef.current = [
+      ...lastMolePositionsRef.current,
+      ...newMoleIndices
+    ].slice(-4); // 只保留最近4个位置的历史
 
     setMoles(prev => {
       const newMoles = [...prev];
@@ -637,6 +652,7 @@ const App: React.FC = () => {
 
     // 地鼠消失时间
     newMoleIndices.forEach(index => {
+      const disappearTime = Math.random() * 1000 + 1000; // 1-2秒后消失
       setTimeout(() => {
         setMoles(prev => {
           if (!prev[index]) return prev;
@@ -644,7 +660,7 @@ const App: React.FC = () => {
           newMoles[index] = false;
           return newMoles;
         });
-      }, Math.random() * 1000 + 1000);
+      }, disappearTime);
     });
   }, [moles, whackedMoles, calculateMoleCount]);
 
@@ -655,7 +671,7 @@ const App: React.FC = () => {
     // 防止重复点击
     if (clickTimeoutRef.current[index]) return;
 
-    setScore(prev => prev + 1);  // 每次打中加1分
+    setScore(prev => prev + 1);
     setWhackedMoles(prev => {
       const newWhacked = [...prev];
       newWhacked[index] = true;
@@ -663,6 +679,12 @@ const App: React.FC = () => {
     });
     
     playHitSound();
+
+    // 将打中的位置添加到历史记录
+    lastMolePositionsRef.current = [
+      ...lastMolePositionsRef.current,
+      index
+    ].slice(-4);
 
     // 设置点击冷却
     clickTimeoutRef.current[index] = setTimeout(() => {
@@ -675,7 +697,7 @@ const App: React.FC = () => {
     }, 300);
   }, [gameActive, isPaused, moles, whackedMoles, playHitSound]);
 
-  // 开始游戏
+  // 开始游戏时重置所有状态
   const startGame = useCallback(() => {
     setGameActive(true);
     setTimeLeft(config.totalTime);
@@ -683,6 +705,12 @@ const App: React.FC = () => {
     setMoles(Array(9).fill(false));
     setWhackedMoles(Array(9).fill(false));
     setShowGameOver(false);
+    // 清除所有状态
+    lastMolePositionsRef.current = [];
+    Object.keys(clickTimeoutRef.current).forEach(key => {
+      clearTimeout(clickTimeoutRef.current[Number(key)]);
+    });
+    clickTimeoutRef.current = {};
     
     // 播放背景音乐
     if (bgmRef.current && !isMuted) {
@@ -926,6 +954,8 @@ const App: React.FC = () => {
   };
 
   const clickTimeoutRef = useRef({});
+
+  const cooldownRef = useRef<{ [key: number]: boolean }>({});  // 用于跟踪位置冷却状态
 
   // 监听配置变化
   useEffect(() => {
