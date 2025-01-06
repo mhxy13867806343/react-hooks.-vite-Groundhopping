@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import styled from '@emotion/styled';
 import { keyframes, css } from '@emotion/react';
 import { Button as AntButton, Modal as AntModal, Select, Space } from 'antd';
@@ -530,23 +530,54 @@ const App: React.FC = () => {
   const [tempConfig, setTempConfig] = useState<GameConfig>(settings);
   const [isMuted, setIsMuted] = useState(false);
 
-  // 创建音频实例
-  const hitAudio = useMemo(() => new Audio(hitSoundUrl), []);
-  const bgmAudio = useMemo(() => {
-    const audio = new Audio(bgmSoundUrl);
-    audio.loop = true;
-    audio.volume = 0.5; // 背景音乐音量调小一点
-    return audio;
-  }, []);
-  const gameoverAudio = useMemo(() => new Audio(gameoverSoundUrl), []);
-
-  // 播放音效
-  const playSound = useCallback((audio: HTMLAudioElement) => {
-    if (!isMuted) {
-      audio.currentTime = 0;
-      audio.play().catch(e => console.log('音频播放失败:', e));
-    }
+  // 创建音效函数
+  const playHitSound = useCallback(() => {
+    if (isMuted) return;
+    
+    const audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
+    const oscillator = audioContext.createOscillator();
+    const gainNode = audioContext.createGain();
+    
+    oscillator.connect(gainNode);
+    gainNode.connect(audioContext.destination);
+    
+    oscillator.type = 'sine';
+    oscillator.frequency.setValueAtTime(500, audioContext.currentTime);
+    oscillator.frequency.exponentialRampToValueAtTime(300, audioContext.currentTime + 0.1);
+    
+    gainNode.gain.setValueAtTime(0.3, audioContext.currentTime);
+    gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.1);
+    
+    oscillator.start();
+    oscillator.stop(audioContext.currentTime + 0.1);
   }, [isMuted]);
+
+  // 打地鼠
+  const whackMole = useCallback((index: number) => {
+    if (!gameActive || isPaused || whackedMoles[index] || !moles[index]) return;
+
+    // 防止重复点击
+    if (clickTimeoutRef.current[index]) return;
+
+    setScore(prev => prev + 10);
+    setWhackedMoles(prev => {
+      const newWhacked = [...prev];
+      newWhacked[index] = true;
+      return newWhacked;
+    });
+    
+    playHitSound();  // 使用新的音效函数
+
+    // 设置点击冷却
+    clickTimeoutRef.current[index] = setTimeout(() => {
+      setWhackedMoles(prev => {
+        const newWhacked = [...prev];
+        newWhacked[index] = false;
+        return newWhacked;
+      });
+      delete clickTimeoutRef.current[index];
+    }, 300);
+  }, [gameActive, isPaused, moles, whackedMoles, playHitSound]);
 
   // 开始游戏
   const startGame = useCallback(() => {
@@ -556,56 +587,20 @@ const App: React.FC = () => {
     setMoles(Array(9).fill(false));
     setWhackedMoles(Array(9).fill(false));
     setShowGameOver(false);
-    playSound(bgmAudio);
-  }, [config.totalTime, bgmAudio, playSound]);
+  }, [config.totalTime]);
 
   // 结束游戏
   const endGame = useCallback(() => {
     setGameActive(false);
     setShowGameOver(true);
-    bgmAudio.pause();
-    bgmAudio.currentTime = 0;
-    playSound(gameoverAudio);
     if (score > highScore) {
       setHighScore(score);
     }
-  }, [score, highScore, bgmAudio, gameoverAudio, playSound]);
-
-  // 打地鼠
-  const whackMole = useCallback((index: number) => {
-    if (!gameActive || isPaused || whackedMoles[index]) return;
     
-    if (moles[index]) {
-      playSound(hitAudio);
-      setScore(prev => prev + 1);
-      setWhackedMoles(prev => {
-        const newWhacked = [...prev];
-        newWhacked[index] = true;
-        return newWhacked;
-      });
-    }
-  }, [gameActive, isPaused, moles, whackedMoles, hitAudio, playSound]);
-
-  // 随机打乱位置
-  const shufflePositions = useCallback(() => {
-    const newPositions = [...positions];
-    for (let i = newPositions.length - 1; i > 0; i--) {
-      const j = Math.floor(Math.random() * (i + 1));
-      [newPositions[i], newPositions[j]] = [newPositions[j], newPositions[i]];
-    }
-    setPositions(newPositions);
-  }, [positions]);
-
-  // 当游戏开始或页面加载时打乱位置
-  useEffect(() => {
-    shufflePositions();
-  }, [gameActive]);
-
-  // 当settings改变时更新config
-  useEffect(() => {
-    setConfig(settings);
-    setTempConfig(settings);
-  }, [settings]);
+    // 清理所有计时器
+    Object.values(clickTimeoutRef.current).forEach(clearTimeout);
+    clickTimeoutRef.current = {};
+  }, [score, highScore]);
 
   // 处理设置的保存
   const handleSaveSettings = () => {
@@ -719,27 +714,11 @@ const App: React.FC = () => {
       const speed = Math.max(config.initialSpeed - progress * (config.initialSpeed - config.minSpeed), config.minSpeed);
       
       moleTimer = setInterval(() => {
-        const numberOfMoles = Math.min(
-          Math.floor((config.totalTime - timeLeft) / (config.totalTime / config.maxMoles)) + 1,
-          config.maxMoles
-        );
-        
-        const newMoles: boolean[] = Array(9).fill(false);
-        const availablePositions = Array.from({length: 9}, (_, i) => i)
-          .filter(pos => !moles[pos]);
-        
-        while (newMoles.filter(Boolean).length < numberOfMoles && availablePositions.length > 0) {
-          const randomIndex = Math.floor(Math.random() * availablePositions.length);
-          const position = availablePositions[randomIndex];
-          newMoles[position] = true;
-          availablePositions.splice(randomIndex, 1);
-        }
-        
-        setMoles(newMoles);
+        showRandomMoles();
       }, speed) as unknown as number;
     }
     return () => clearInterval(moleTimer);
-  }, [gameActive, isPaused, timeLeft, config, moles]);
+  }, [gameActive, isPaused, timeLeft, config]);
 
   // 游戏计时器
   useEffect(() => {
@@ -813,6 +792,46 @@ const App: React.FC = () => {
     setMoles(Array(9).fill(false));
     setWhackedMoles(Array(9).fill(false));
   };
+
+  // 随机显示地鼠
+  const showRandomMoles = useCallback(() => {
+    const maxMoles = Math.min(3, 9 - moles.filter(m => m).length); // 最多同时出现3个地鼠
+    if (maxMoles <= 0) return;
+
+    const availableHoles = moles.reduce((acc, mole, index) => {
+      if (!mole && !whackedMoles[index]) acc.push(index);
+      return acc;
+    }, [] as number[]);
+
+    if (availableHoles.length === 0) return;
+
+    const numNewMoles = Math.floor(Math.random() * maxMoles) + 1;
+    const newMoleIndices = availableHoles
+      .sort(() => Math.random() - 0.5)
+      .slice(0, numNewMoles);
+
+    setMoles(prev => {
+      const newMoles = [...prev];
+      newMoleIndices.forEach(index => {
+        newMoles[index] = true;
+      });
+      return newMoles;
+    });
+
+    // 地鼠消失时间
+    newMoleIndices.forEach(index => {
+      setTimeout(() => {
+        setMoles(prev => {
+          if (!prev[index]) return prev; // 如果已经被打掉了，就不需要再设置false
+          const newMoles = [...prev];
+          newMoles[index] = false;
+          return newMoles;
+        });
+      }, Math.random() * 1000 + 1000); // 1-2秒后消失
+    });
+  }, [moles, whackedMoles]);
+
+  const clickTimeoutRef = useRef({});
 
   return (
     <GameContainer>
