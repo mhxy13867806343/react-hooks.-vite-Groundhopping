@@ -313,6 +313,72 @@ const ResumeButton = styled(Button)`
   }
 `;
 
+const ButtonGroup = styled.div`
+  display: flex;
+  gap: 20px;
+  margin-top: 20px;
+`;
+
+const EndGameButton = styled(Button)`
+  background: #ff4757;
+  &:hover {
+    background: #ff6b81;
+  }
+`;
+
+const ConfirmModal = styled(Modal)`
+  .content {
+    text-align: center;
+    padding: 30px;
+    border-radius: 15px;
+    background: rgba(255, 255, 255, 0.95);
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+
+    h3 {
+      color: #333;
+      margin-bottom: 20px;
+      font-size: 1.5rem;
+    }
+
+    p {
+      color: #666;
+      margin-bottom: 25px;
+      font-size: 1.1rem;
+    }
+
+    .button-group {
+      display: flex;
+      justify-content: center;
+      gap: 15px;
+
+      button {
+        padding: 10px 25px;
+        border-radius: 8px;
+        border: none;
+        cursor: pointer;
+        font-size: 1rem;
+        transition: all 0.3s ease;
+
+        &.confirm {
+          background: #ff4757;
+          color: white;
+          &:hover {
+            background: #ff6b81;
+          }
+        }
+
+        &.cancel {
+          background: #f1f2f6;
+          color: #333;
+          &:hover {
+            background: #dfe4ea;
+          }
+        }
+      }
+    }
+  }
+`;
+
 const App: React.FC = () => {
   const [score, setScore] = useState(0);
   const [gameActive, setGameActive] = useState(false);
@@ -323,6 +389,7 @@ const App: React.FC = () => {
   const [whackedMole, setWhackedMole] = useState<number | null>(null);
   const [showEndModal, setShowEndModal] = useState(false);
   const [config, setConfig] = useState<GameConfig>(defaultConfig);
+  const [showConfirmEndGame, setShowConfirmEndGame] = useState(false);
 
   // 处理空格键暂停
   useEffect(() => {
@@ -439,6 +506,28 @@ const App: React.FC = () => {
     return ((config.totalTime - timeLeft) / config.totalTime) * 100;
   };
 
+  const endGame = () => {
+    setGameActive(false);
+    setIsPaused(false);
+    setTimeLeft(config.totalTime);
+    setScore(0);
+    setActiveMoles([]);
+    setWhackedMole(-1);
+  };
+
+  const handleEndGameClick = () => {
+    setShowConfirmEndGame(true);
+  };
+
+  const handleConfirmEndGame = () => {
+    setShowConfirmEndGame(false);
+    endGame();
+  };
+
+  const handleCancelEndGame = () => {
+    setShowConfirmEndGame(false);
+  };
+
   return (
     <GameContainer>
       <GithubLink 
@@ -525,10 +614,32 @@ const App: React.FC = () => {
             剩余时间: {Math.floor(timeLeft / 60)}:{(timeLeft % 60).toString().padStart(2, '0')}
           </div>
           <p>按空格键或点击下方按钮继续游戏</p>
-          <ResumeButton onClick={() => setIsPaused(false)}>
-            继续游戏
-          </ResumeButton>
+          <ButtonGroup>
+            <ResumeButton onClick={() => setIsPaused(false)}>
+              继续游戏
+            </ResumeButton>
+            <EndGameButton onClick={handleEndGameClick}>
+              结束游戏
+            </EndGameButton>
+          </ButtonGroup>
         </PauseOverlay>
+      )}
+
+      {showConfirmEndGame && (
+        <ConfirmModal>
+          <div className="content">
+            <h3>确认结束游戏？</h3>
+            <p>当前进度将不会保存，确定要结束当前游戏吗？</p>
+            <div className="button-group">
+              <button className="cancel" onClick={handleCancelEndGame}>
+                取消
+              </button>
+              <button className="confirm" onClick={handleConfirmEndGame}>
+                确认结束
+              </button>
+            </div>
+          </div>
+        </ConfirmModal>
       )}
 
       {showEndModal && (
