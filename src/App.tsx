@@ -704,44 +704,44 @@ const App: React.FC = () => {
     setScore(0);
     setMoles(Array(9).fill(false));
     setWhackedMoles(Array(9).fill(false));
+    setIsPaused(false);
+    setShowEndConfirm(false);
     setShowGameOver(false);
-    // 清除所有状态
-    lastMolePositionsRef.current = [];
-    Object.keys(clickTimeoutRef.current).forEach(key => {
-      clearTimeout(clickTimeoutRef.current[Number(key)]);
-    });
-    clickTimeoutRef.current = {};
-    
     // 播放背景音乐
     if (bgmRef.current && !isMuted) {
       bgmRef.current.currentTime = 0;
-      bgmRef.current.play().catch(console.error);
+      bgmRef.current.play();
     }
   }, [config.totalTime, isMuted]);
 
   // 结束游戏
   const endGame = useCallback(() => {
     setGameActive(false);
-    setShowGameOver(true);
-    
-    // 停止背景音乐，播放游戏结束音效
+    setIsPaused(false);
+    setTimeLeft(0);
+    setMoles(Array(9).fill(false));
+    setWhackedMoles(Array(9).fill(false));
+    // 停止背景音乐
     if (bgmRef.current) {
       bgmRef.current.pause();
       bgmRef.current.currentTime = 0;
     }
-    
+    // 播放游戏结束音效
     if (gameoverRef.current && !isMuted) {
       gameoverRef.current.currentTime = 0;
-      gameoverRef.current.play().catch(console.error);
+      gameoverRef.current.play();
     }
-
     if (score > highScore) {
       setHighScore(score);
     }
-    
     // 清理所有计时器
     Object.values(clickTimeoutRef.current).forEach(clearTimeout);
     clickTimeoutRef.current = {};
+    // 停止背景音乐
+    if (bgmRef.current) {
+      bgmRef.current.pause();
+      bgmRef.current.currentTime = 0;
+    }
   }, [score, highScore, isMuted]);
 
   // 处理设置的保存
@@ -901,57 +901,25 @@ const App: React.FC = () => {
 
   // 处理结束游戏按钮点击
   const handleEndGameClick = () => {
-    if (gameActive) {
-      setIsPaused(true);
-      setShowEndConfirm(true);
-    }
+    resetGameState();
   };
 
-  // 确认结束游戏
-  const handleConfirmEndGame = () => {
-    setShowEndConfirm(false);
-    endGame();
-  };
-
-  // 取消结束游戏
-  const handleCancelEndGame = () => {
-    setShowEndConfirm(false);
-    setIsPaused(false);
-  };
-
-  const getScoreGrade = (score: number): string => {
-    if (score >= 90) return 'A+';
-    if (score >= 80) return 'A';
-    if (score >= 70) return 'B';
-    if (score >= 60) return 'C';
-    if (score >= 40) return 'D';
-    return 'F';
-  };
-
-  const getScoreDescription = (score: number): string => {
-    if (score >= 90) return '太棒了！你是打地鼠高手！';
-    if (score >= 80) return '非常好！继续保持！';
-    if (score >= 70) return '做得不错！';
-    if (score >= 60) return '及格了，还需要努力！';
-    if (score >= 40) return '继续加油，你可以的！';
-    return '别灰心，再试一次！';
-  };
-
-  // 退出游戏
-  const handleExitClick = () => {
-    setShowEndConfirm(true);
-  };
-
-  // 确认退出
-  const confirmExit = () => {
-    setShowEndConfirm(false);
-    setShowGameOver(false);
+  // 重置游戏状态
+  const resetGameState = useCallback(() => {
     setGameActive(false);
-    setTimeLeft(0);
+    setIsPaused(false);
+    setTimeLeft(config.totalTime);
     setScore(0);
     setMoles(Array(9).fill(false));
     setWhackedMoles(Array(9).fill(false));
-  };
+    setShowEndConfirm(false);
+    setShowGameOver(false);
+    // 停止背景音乐
+    if (bgmRef.current) {
+      bgmRef.current.pause();
+      bgmRef.current.currentTime = 0;
+    }
+  }, [config.totalTime]);
 
   const clickTimeoutRef = useRef({});
 
@@ -1064,30 +1032,12 @@ const App: React.FC = () => {
               <StyledButton onClick={startGame}>
                 {translations[config.language].tryAgain}
               </StyledButton>
-              <StyledButton onClick={handleExitClick} style={{ backgroundColor: '#ff4d4f' }}>
+              <StyledButton onClick={() => resetGameState()} style={{ backgroundColor: '#ff4d4f' }}>
                 {translations[config.language].exitGame}
               </StyledButton>
             </ButtonGroup>
           </ModalContent>
         </Modal>
-      )}
-
-      {/* 确认退出弹窗 */}
-      {showEndConfirm && (
-        <ConfirmModal>
-          <div className="content">
-            <h3>{translations[config.language].confirmEnd}</h3>
-            <p>{translations[config.language].confirmEndDesc}</p>
-            <div className="button-group">
-              <button className="cancel" onClick={() => setShowEndConfirm(false)}>
-                {translations[config.language].cancel}
-              </button>
-              <button className="confirm" onClick={confirmExit}>
-                {translations[config.language].confirm}
-              </button>
-            </div>
-          </div>
-        </ConfirmModal>
       )}
 
       <GithubLink
