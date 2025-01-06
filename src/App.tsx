@@ -46,6 +46,33 @@ const GameContainer = styled.div`
   position: relative;
 `;
 
+const GithubLink = styled.a`
+  position: absolute;
+  top: 20px;
+  right: 20px;
+  color: white;
+  text-decoration: none;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 1rem;
+  padding: 8px 16px;
+  background: rgba(0, 0, 0, 0.2);
+  border-radius: 20px;
+  transition: all 0.3s ease;
+
+  &:hover {
+    background: rgba(0, 0, 0, 0.4);
+    transform: translateY(-2px);
+  }
+
+  svg {
+    width: 20px;
+    height: 20px;
+    fill: currentColor;
+  }
+`;
+
 const ProgressBar = styled.div<{ progress: number }>`
   position: absolute;
   top: 0;
@@ -243,29 +270,29 @@ const PauseOverlay = styled.div`
   right: 0;
   bottom: 0;
   background: rgba(0, 0, 0, 0.7);
+  backdrop-filter: blur(5px);
   display: flex;
   flex-direction: column;
   justify-content: center;
   align-items: center;
   z-index: 1000;
-  backdrop-filter: blur(5px);
-  
+
   h2 {
     color: white;
     font-size: 2.5rem;
     margin-bottom: 20px;
     text-shadow: 2px 2px 4px rgba(0,0,0,0.5);
   }
-  
+
   p {
     color: white;
-    font-size: 1.2rem;
     margin-bottom: 10px;
+    font-size: 1.2rem;
   }
 
   .score-display {
     color: #4CAF50;
-    font-size: 3rem;
+    font-size: 4rem;
     font-weight: bold;
     margin: 20px 0;
     text-shadow: 2px 2px 4px rgba(0,0,0,0.5);
@@ -273,8 +300,9 @@ const PauseOverlay = styled.div`
 
   .time-display {
     color: #ffd700;
-    font-size: 1.5rem;
+    font-size: 2rem;
     margin-bottom: 30px;
+    text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
   }
 `;
 
@@ -413,23 +441,19 @@ const App: React.FC = () => {
 
   return (
     <GameContainer>
+      <GithubLink 
+        href="https://github.com/mhxy13867806343/react-hooks.-vite-Groundhopping" 
+        target="_blank"
+        rel="noopener noreferrer"
+      >
+        <svg viewBox="0 0 24 24">
+          <path d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z"/>
+        </svg>
+        GitHub
+      </GithubLink>
+
       {gameActive && <ProgressBar progress={calculateProgress()} />}
       
-      {isPaused && gameActive && (
-        <PauseOverlay>
-          <h2>游戏暂停</h2>
-          <p>当前得分</p>
-          <div className="score-display">{score}</div>
-          <div className="time-display">
-            剩余时间: {Math.floor(timeLeft / 60)}:{(timeLeft % 60).toString().padStart(2, '0')}
-          </div>
-          <p>按空格键或点击下方按钮继续游戏</p>
-          <ResumeButton onClick={() => setIsPaused(false)}>
-            继续游戏
-          </ResumeButton>
-        </PauseOverlay>
-      )}
-
       <h1 style={{ color: '#fff', textShadow: '2px 2px 4px rgba(0,0,0,0.3)' }}>
         打地鼠游戏
       </h1>
@@ -471,6 +495,16 @@ const App: React.FC = () => {
         {isPaused && <div style={{ color: '#ff6b6b' }}>已暂停</div>}
       </ScoreBoard>
 
+      <Button
+        onClick={startGame}
+        disabled={gameActive && !isPaused}
+        style={{ margin: '20px 0' }}
+      >
+        {gameActive 
+          ? (isPaused ? '继续游戏' : '游戏进行中...') 
+          : '开始游戏'}
+      </Button>
+
       <Grid>
         {Array(9).fill(null).map((_, index) => (
           <HoleContainer key={index} onClick={() => whackMole(index)}>
@@ -482,14 +516,20 @@ const App: React.FC = () => {
         ))}
       </Grid>
 
-      <Button
-        onClick={startGame}
-        disabled={gameActive && !isPaused}
-      >
-        {gameActive 
-          ? (isPaused ? '继续游戏' : '游戏进行中...') 
-          : '开始游戏'}
-      </Button>
+      {isPaused && gameActive && (
+        <PauseOverlay>
+          <h2>游戏暂停</h2>
+          <p>当前得分</p>
+          <div className="score-display">{score}</div>
+          <div className="time-display">
+            剩余时间: {Math.floor(timeLeft / 60)}:{(timeLeft % 60).toString().padStart(2, '0')}
+          </div>
+          <p>按空格键或点击下方按钮继续游戏</p>
+          <ResumeButton onClick={() => setIsPaused(false)}>
+            继续游戏
+          </ResumeButton>
+        </PauseOverlay>
+      )}
 
       {showEndModal && (
         <Modal>
@@ -506,6 +546,7 @@ const App: React.FC = () => {
       )}
     </GameContainer>
   );
+
 };
 
 export default App;

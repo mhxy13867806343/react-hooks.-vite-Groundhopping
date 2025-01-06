@@ -1,50 +1,93 @@
-# React + TypeScript + Vite
+# 打地鼠游戏 (Whack-a-Mole)
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+一个使用 React + TypeScript + Vite 构建的现代打地鼠游戏。
 
-Currently, two official plugins are available:
+[在线游玩](https://github.com/mhxy13867806343/react-hooks.-vite-Groundhopping)
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react/README.md) uses [Babel](https://babeljs.io/) for Fast Refresh
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react-swc) uses [SWC](https://swc.rs/) for Fast Refresh
+## 游戏特点
 
-## Expanding the ESLint configuration
+- 可配置的游戏时间（10秒-120秒）
+- 动态地鼠数量（1-9只）
+- 支持空格键暂停/继续
+- 实时进度条显示
+- 最高分记录
+- 流畅的动画效果
+- 响应式设计
 
-If you are developing a production application, we recommend updating the configuration to enable type aware lint rules:
+## 技术栈
 
-- Configure the top-level `parserOptions` property like this:
+- React 18
+- TypeScript
+- Vite
+- Emotion (样式解决方案)
+- Modern CSS Features
 
-```js
-export default tseslint.config({
-  languageOptions: {
-    // other options...
-    parserOptions: {
-      project: ['./tsconfig.node.json', './tsconfig.app.json'],
-      tsconfigRootDir: import.meta.dirname,
-    },
-  },
-})
+## 快速开始
+
+1. 克隆项目
+```bash
+git clone https://github.com/mhxy13867806343/react-hooks.-vite-Groundhopping.git
+cd react-hooks.-vite-Groundhopping
 ```
 
-- Replace `tseslint.configs.recommended` to `tseslint.configs.recommendedTypeChecked` or `tseslint.configs.strictTypeChecked`
-- Optionally add `...tseslint.configs.stylisticTypeChecked`
-- Install [eslint-plugin-react](https://github.com/jsx-eslint/eslint-plugin-react) and update the config:
-
-```js
-// eslint.config.js
-import react from 'eslint-plugin-react'
-
-export default tseslint.config({
-  // Set the react version
-  settings: { react: { version: '18.3' } },
-  plugins: {
-    // Add the react plugin
-    react,
-  },
-  rules: {
-    // other rules...
-    // Enable its recommended rules
-    ...react.configs.recommended.rules,
-    ...react.configs['jsx-runtime'].rules,
-  },
-})
+2. 安装依赖
+```bash
+npm install
 ```
+
+3. 启动开发服务器
+```bash
+npm run dev
+```
+
+4. 构建生产版本
+```bash
+npm run build
+```
+
+## 游戏规则
+
+1. 游戏开始时可以配置：
+   - 总游戏时间（10秒-120秒）
+   - 最大地鼠数量（1-9只）
+   
+2. 游戏过程：
+   - 点击出现的地鼠得分
+   - 地鼠数量会随时间增加
+   - 地鼠出现速度会逐渐加快
+   
+3. 控制功能：
+   - 空格键：暂停/继续游戏
+   - 点击地鼠：得分
+   - 暂停时显示当前分数和剩余时间
+
+## 游戏配置
+
+- 时间和地鼠数量联动：
+  - 60秒 → 5只地鼠
+  - 120秒 → 9只地鼠
+  - 时间和数量之间线性对应
+
+## 开发功能
+
+- [x] 基础打地鼠功能
+- [x] 计分系统
+- [x] 暂停功能
+- [x] 进度条显示
+- [x] 配置面板
+- [x] 响应式设计
+- [ ] 音效系统
+- [ ] 难度选择
+- [ ] 排行榜系统
+
+## 许可证
+
+MIT
+
+## 贡献
+
+欢迎提交 Issue 和 Pull Request！
+
+## 作者
+
+[mhxy13867806343](https://github.com/mhxy13867806343)
