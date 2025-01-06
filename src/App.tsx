@@ -129,6 +129,16 @@ const GameContainer = styled.div`
   position: relative;
 `;
 
+const ProgressBar = styled.div<{ progress: number }>`
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: ${props => props.progress}%;
+  height: 4px;
+  background: linear-gradient(to right, #ff6b6b, #4ecdc4);
+  transition: width 0.3s ease;
+`;
+
 const GithubLink = styled.a`
   position: absolute;
   top: 20px;
@@ -176,26 +186,16 @@ const StyledSettingsButton = styled(AntButton)`
   }
 `;
 
-const ProgressBar = styled.div<{ progress: number }>`
-  position: absolute;
-  top: 0;
-  left: 0;
-  width: 100%;
-  height: 8px;
-  background: rgba(255, 255, 255, 0.3);
-  border-radius: 20px 20px 0 0;
-  overflow: hidden;
-
-  &::after {
-    content: '';
-    position: absolute;
-    top: 0;
-    left: 0;
-    height: 100%;
-    width: ${props => props.progress}%;
-    background: linear-gradient(90deg, #4CAF50, #45a049);
-    transition: width 0.3s linear;
-  }
+const Grid = styled.div`
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 20px;
+  margin: 20px auto;
+  max-width: 600px;
+  background: #4a8505;
+  padding: 20px;
+  border-radius: 15px;
+  position: relative;
 `;
 
 const ConfigPanel = styled.div`
@@ -221,15 +221,40 @@ const ConfigPanel = styled.div`
   }
 `;
 
-const Grid = styled.div`
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
+const StatsPanel = styled.div`
+  background: rgba(0, 0, 0, 0.7);
+  color: white;
+  padding: 10px 20px;
+  border-radius: 10px;
+  margin-bottom: 20px;
+  display: flex;
+  justify-content: center;
   gap: 20px;
-  margin: 20px auto;
-  max-width: 600px;
-  background: #4a8505;
-  padding: 20px;
-  border-radius: 15px;
+  
+  span {
+    font-size: 1.2em;
+  }
+`;
+
+const Button = styled(AntButton)`
+  margin: 5px;
+  min-width: 100px;
+`;
+
+const Modal = styled(AntModal)`
+  .ant-modal-content {
+    background: rgba(255, 255, 255, 0.9);
+    border-radius: 15px;
+  }
+  
+  .ant-modal-header {
+    background: transparent;
+    border-bottom: none;
+  }
+  
+  .ant-modal-footer {
+    border-top: none;
+  }
 `;
 
 const popUp = keyframes`
@@ -315,7 +340,7 @@ const TimeText = styled.span<{ isLow: boolean }>`
   `}
 `;
 
-const Button = styled.button`
+const StyledButton = styled.button`
   background: #ff6b6b;
   color: white;
   border: none;
@@ -339,19 +364,6 @@ const Button = styled.button`
     transform: none;
     box-shadow: none;
   }
-`;
-
-const Modal = styled.div`
-  position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background: rgba(0, 0, 0, 0.7);
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  z-index: 1000;
 `;
 
 const ModalContent = styled.div`
@@ -433,7 +445,7 @@ const PauseOverlay = styled.div`
   }
 `;
 
-const ResumeButton = styled(Button)`
+const ResumeButton = styled(StyledButton)`
   background: #4CAF50;
   &:hover {
     background: #45a049;
@@ -447,7 +459,7 @@ const ButtonGroup = styled.div`
   margin-top: 20px;
 `;
 
-const EndGameButton = styled(Button)`
+const EndGameButton = styled(StyledButton)`
   background: #ff4757;
   &:hover {
     background: #ff6b81;
@@ -584,6 +596,58 @@ const App: React.FC = () => {
     oscillator.stop(audioContext.currentTime + 0.1);
   }, [isMuted]);
 
+  // 计算当前应该出现的地鼠数量
+  const calculateMoleCount = useCallback(() => {
+    const timeProgress = 1 - timeLeft / config.totalTime; // 时间进度 0-1
+    const baseCount = 1; // 基础数量
+    const additionalCount = Math.floor(timeProgress * 8); // 随时间增加的数量，最多增加8个
+    return Math.min(baseCount + additionalCount, 9); // 总数不超过9个
+  }, [timeLeft, config.totalTime]);
+
+  // 随机显示地鼠
+  const showRandomMoles = useCallback(() => {
+    const targetMoleCount = calculateMoleCount();
+    const currentMoleCount = moles.filter(m => m).length;
+    
+    if (currentMoleCount >= targetMoleCount) return;
+
+    const availableHoles = moles.reduce((acc, mole, index) => {
+      if (!mole && !whackedMoles[index]) acc.push(index);
+      return acc;
+    }, [] as number[]);
+
+    if (availableHoles.length === 0) return;
+
+    const numNewMoles = Math.min(
+      targetMoleCount - currentMoleCount,
+      Math.floor(Math.random() * 3) + 1 // 每次随机添加1-3个地鼠
+    );
+
+    const newMoleIndices = availableHoles
+      .sort(() => Math.random() - 0.5)
+      .slice(0, numNewMoles);
+
+    setMoles(prev => {
+      const newMoles = [...prev];
+      newMoleIndices.forEach(index => {
+        newMoles[index] = true;
+      });
+      return newMoles;
+    });
+
+    // 地鼠消失时间
+    newMoleIndices.forEach(index => {
+      setTimeout(() => {
+        setMoles(prev => {
+          if (!prev[index]) return prev;
+          const newMoles = [...prev];
+          newMoles[index] = false;
+          return newMoles;
+        });
+      }, Math.random() * 1000 + 1000);
+    });
+  }, [moles, whackedMoles, calculateMoleCount]);
+
   // 打地鼠
   const whackMole = useCallback((index: number) => {
     if (!gameActive || isPaused || whackedMoles[index] || !moles[index]) return;
@@ -591,14 +655,20 @@ const App: React.FC = () => {
     // 防止重复点击
     if (clickTimeoutRef.current[index]) return;
 
-    setScore(prev => prev + 10);
+    // 根据剩余时间计算分数
+    const timeProgress = 1 - timeLeft / config.totalTime;
+    const baseScore = 10;
+    const bonusScore = Math.floor(timeProgress * 20); // 最多额外得20分
+    const totalScore = baseScore + bonusScore;
+
+    setScore(prev => prev + totalScore);
     setWhackedMoles(prev => {
       const newWhacked = [...prev];
       newWhacked[index] = true;
       return newWhacked;
     });
     
-    playHitSound();  // 使用新的音效函数
+    playHitSound();
 
     // 设置点击冷却
     clickTimeoutRef.current[index] = setTimeout(() => {
@@ -609,7 +679,7 @@ const App: React.FC = () => {
       });
       delete clickTimeoutRef.current[index];
     }, 300);
-  }, [gameActive, isPaused, moles, whackedMoles, playHitSound]);
+  }, [gameActive, isPaused, moles, whackedMoles, timeLeft, config.totalTime, playHitSound]);
 
   // 开始游戏
   const startGame = useCallback(() => {
@@ -851,44 +921,6 @@ const App: React.FC = () => {
     setWhackedMoles(Array(9).fill(false));
   };
 
-  // 随机显示地鼠
-  const showRandomMoles = useCallback(() => {
-    const maxMoles = Math.min(3, 9 - moles.filter(m => m).length); // 最多同时出现3个地鼠
-    if (maxMoles <= 0) return;
-
-    const availableHoles = moles.reduce((acc, mole, index) => {
-      if (!mole && !whackedMoles[index]) acc.push(index);
-      return acc;
-    }, [] as number[]);
-
-    if (availableHoles.length === 0) return;
-
-    const numNewMoles = Math.floor(Math.random() * maxMoles) + 1;
-    const newMoleIndices = availableHoles
-      .sort(() => Math.random() - 0.5)
-      .slice(0, numNewMoles);
-
-    setMoles(prev => {
-      const newMoles = [...prev];
-      newMoleIndices.forEach(index => {
-        newMoles[index] = true;
-      });
-      return newMoles;
-    });
-
-    // 地鼠消失时间
-    newMoleIndices.forEach(index => {
-      setTimeout(() => {
-        setMoles(prev => {
-          if (!prev[index]) return prev; // 如果已经被打掉了，就不需要再设置false
-          const newMoles = [...prev];
-          newMoles[index] = false;
-          return newMoles;
-        });
-      }, Math.random() * 1000 + 1000); // 1-2秒后消失
-    });
-  }, [moles, whackedMoles]);
-
   const clickTimeoutRef = useRef({});
 
   // 监听配置变化
@@ -898,6 +930,7 @@ const App: React.FC = () => {
 
   return (
     <GameContainer>
+      <ProgressBar progress={(1 - timeLeft / config.totalTime) * 100} />
       <h1>
         {translations[config.language].title}
       </h1>
@@ -909,7 +942,7 @@ const App: React.FC = () => {
         </TimeText>
       </ScoreBoard>
 
-      <Button
+      <StyledButton
         onClick={gameActive ? handleEndGameClick : startGame}
         disabled={gameActive && !isPaused}
         style={{ margin: '20px 0' }}
@@ -917,14 +950,14 @@ const App: React.FC = () => {
         {gameActive 
           ? (isPaused ? translations[config.language].resumeGame : translations[config.language].endGame)
           : translations[config.language].startGame}
-      </Button>
+      </StyledButton>
 
-      <Button 
+      <StyledButton 
         onClick={() => setIsMuted(!isMuted)} 
         style={{ marginLeft: '10px', backgroundColor: isMuted ? '#999' : '#1890ff' }}
       >
         {isMuted ? '🔇' : '🔊'}
-      </Button>
+      </StyledButton>
 
       <Grid>
         {positions.map((position, index) => (
@@ -994,12 +1027,12 @@ const App: React.FC = () => {
               </p>
             )}
             <ButtonGroup>
-              <Button onClick={startGame}>
+              <StyledButton onClick={startGame}>
                 {translations[config.language].tryAgain}
-              </Button>
-              <Button onClick={handleExitClick} style={{ backgroundColor: '#ff4d4f' }}>
+              </StyledButton>
+              <StyledButton onClick={handleExitClick} style={{ backgroundColor: '#ff4d4f' }}>
                 {translations[config.language].exitGame}
-              </Button>
+              </StyledButton>
             </ButtonGroup>
           </ModalContent>
         </Modal>
