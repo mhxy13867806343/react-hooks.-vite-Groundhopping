@@ -1,9 +1,13 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import styled from '@emotion/styled';
 import { keyframes, css } from '@emotion/react';
 import { Button as AntButton, Modal as AntModal, Select, Space } from 'antd';
 import { SettingOutlined } from '@ant-design/icons';
 import { useGameSettings } from './hooks/useGameSettings';
+
+const hitSoundUrl = 'https://assets.mixkit.co/active_storage/sfx/2571/2571-preview.mp3';
+const bgmSoundUrl = 'https://assets.mixkit.co/active_storage/sfx/123/123-preview.mp3';
+const gameoverSoundUrl = 'https://assets.mixkit.co/active_storage/sfx/1435/1435-preview.mp3';
 
 // 游戏配置接口
 interface GameConfig {
@@ -521,10 +525,66 @@ const App: React.FC = () => {
   const [showEndConfirm, setShowEndConfirm] = useState(false);
   const [showGameOver, setShowGameOver] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
-  const [showExitConfirm, setShowExitConfirm] = useState(false);
   const { settings, saveSettings } = useGameSettings();
   const [config, setConfig] = useState<GameConfig>(settings);
   const [tempConfig, setTempConfig] = useState<GameConfig>(settings);
+  const [isMuted, setIsMuted] = useState(false);
+
+  // 创建音频实例
+  const hitAudio = useMemo(() => new Audio(hitSoundUrl), []);
+  const bgmAudio = useMemo(() => {
+    const audio = new Audio(bgmSoundUrl);
+    audio.loop = true;
+    audio.volume = 0.5; // 背景音乐音量调小一点
+    return audio;
+  }, []);
+  const gameoverAudio = useMemo(() => new Audio(gameoverSoundUrl), []);
+
+  // 播放音效
+  const playSound = useCallback((audio: HTMLAudioElement) => {
+    if (!isMuted) {
+      audio.currentTime = 0;
+      audio.play().catch(e => console.log('音频播放失败:', e));
+    }
+  }, [isMuted]);
+
+  // 开始游戏
+  const startGame = useCallback(() => {
+    setGameActive(true);
+    setTimeLeft(config.totalTime);
+    setScore(0);
+    setMoles(Array(9).fill(false));
+    setWhackedMoles(Array(9).fill(false));
+    setShowGameOver(false);
+    playSound(bgmAudio);
+  }, [config.totalTime, bgmAudio, playSound]);
+
+  // 结束游戏
+  const endGame = useCallback(() => {
+    setGameActive(false);
+    setShowGameOver(true);
+    bgmAudio.pause();
+    bgmAudio.currentTime = 0;
+    playSound(gameoverAudio);
+    if (score > highScore) {
+      setHighScore(score);
+    }
+  }, [score, highScore, bgmAudio, gameoverAudio, playSound]);
+
+  // 打地鼠
+  const whackMole = useCallback((index: number) => {
+    if (!gameActive || isPaused || whackedMoles[index]) return;
+    
+    if (moles[index]) {
+      playSound(hitAudio);
+      setScore(prev => prev + 1);
+      setWhackedMoles(prev => {
+        const newWhacked = [...prev];
+        newWhacked[index] = true;
+        return newWhacked;
+      });
+    }
+  }, [gameActive, isPaused, moles, whackedMoles, hitAudio, playSound]);
 
   // 随机打乱位置
   const shufflePositions = useCallback(() => {
@@ -681,23 +741,6 @@ const App: React.FC = () => {
     return () => clearInterval(moleTimer);
   }, [gameActive, isPaused, timeLeft, config, moles]);
 
-  // 打地鼠逻辑
-  const whackMole = (index: number) => {
-    if (gameActive && !isPaused && moles[index]) {
-      setScore(prev => prev + 1);
-      setWhackedMoles(prev => prev.map((mole, i) => i === index ? true : mole));
-      
-      // 播放打击音效
-      const audio = new Audio('data:audio/wav;base64,UklGRl9vT19XQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YU');
-      audio.play().catch(() => {});
-      
-      // 重置whacked动画状态
-      setTimeout(() => {
-        setWhackedMoles(prev => prev.map((mole, i) => i === index ? false : mole));
-      }, 500);
-    }
-  };
-
   // 游戏计时器
   useEffect(() => {
     let timer: number;
@@ -716,31 +759,6 @@ const App: React.FC = () => {
     }
     return () => clearInterval(timer);
   }, [gameActive, isPaused, score]);
-
-  // 开始游戏
-  const startGame = () => {
-    shufflePositions(); // 游戏开始时打乱位置
-    setScore(0);
-    setGameActive(true);
-    setIsPaused(false);
-    setTimeLeft(config.totalTime);
-    setMoles(Array(9).fill(false));
-    setWhackedMoles(Array(9).fill(false));
-    setShowEndConfirm(false);
-    setShowGameOver(false);
-  };
-
-  // 结束游戏
-  const endGame = () => {
-    setGameActive(false);
-    setIsPaused(false);
-    setTimeLeft(config.totalTime);
-    setScore(0);
-    setMoles(Array(9).fill(false));
-    setWhackedMoles(Array(9).fill(false));
-    setShowEndConfirm(false);
-    setShowGameOver(false);
-  };
 
   // 处理结束游戏按钮点击
   const handleEndGameClick = () => {
@@ -782,12 +800,12 @@ const App: React.FC = () => {
 
   // 退出游戏
   const handleExitClick = () => {
-    setShowExitConfirm(true);
+    setShowEndConfirm(true);
   };
 
   // 确认退出
   const confirmExit = () => {
-    setShowExitConfirm(false);
+    setShowEndConfirm(false);
     setShowGameOver(false);
     setGameActive(false);
     setTimeLeft(0);
@@ -817,6 +835,13 @@ const App: React.FC = () => {
         {gameActive 
           ? (isPaused ? translations[config.language].resumeGame : translations[config.language].endGame)
           : translations[config.language].startGame}
+      </Button>
+
+      <Button 
+        onClick={() => setIsMuted(!isMuted)} 
+        style={{ marginLeft: '10px', backgroundColor: isMuted ? '#999' : '#1890ff' }}
+      >
+        {isMuted ? '🔇' : '🔊'}
       </Button>
 
       <Grid>
@@ -899,13 +924,13 @@ const App: React.FC = () => {
       )}
 
       {/* 确认退出弹窗 */}
-      {showExitConfirm && (
+      {showEndConfirm && (
         <ConfirmModal>
           <div className="content">
             <h3>{translations[config.language].confirmEnd}</h3>
             <p>{translations[config.language].confirmEndDesc}</p>
             <div className="button-group">
-              <button className="cancel" onClick={() => setShowExitConfirm(false)}>
+              <button className="cancel" onClick={() => setShowEndConfirm(false)}>
                 {translations[config.language].cancel}
               </button>
               <button className="confirm" onClick={confirmExit}>
