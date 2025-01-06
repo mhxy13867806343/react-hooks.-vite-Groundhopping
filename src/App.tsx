@@ -69,7 +69,11 @@ const translations = {
     newRecord: '新纪录！🎉',
     keepTrying: '继续加油！💪',
     playAgain: '再来一局',
-    language: '语言'
+    language: '语言',
+    tryAgain: '再试一次',
+    backToMenu: '返回菜单',
+    finalScore: '最终得分',
+    newHighScore: '新高分！'
   },
   en: {
     title: 'Whack-a-Mole',
@@ -99,7 +103,11 @@ const translations = {
     newRecord: 'New Record! 🎉',
     keepTrying: 'Keep Going! 💪',
     playAgain: 'Play Again',
-    language: 'Language'
+    language: 'Language',
+    tryAgain: 'Try Again',
+    backToMenu: 'Back to Menu',
+    finalScore: 'Final Score',
+    newHighScore: 'New High Score!'
   }
 };
 
@@ -467,6 +475,13 @@ const ConfirmModal = styled(Modal)`
   }
 `;
 
+const ScoreGrade = styled.div<{ score: number }>`
+  font-size: 24px;
+  margin-top: 20px;
+  color: ${props => props.score < 60 ? '#ff4d4f' : '#52c41a'};
+  font-weight: bold;
+`;
+
 const App: React.FC = () => {
   const [score, setScore] = useState(0);
   const [gameActive, setGameActive] = useState(false);
@@ -719,6 +734,24 @@ const App: React.FC = () => {
     setIsPaused(false);
   };
 
+  const getScoreGrade = (score: number): string => {
+    if (score >= 90) return 'A+';
+    if (score >= 80) return 'A';
+    if (score >= 70) return 'B';
+    if (score >= 60) return 'C';
+    if (score >= 40) return 'D';
+    return 'F';
+  };
+
+  const getScoreDescription = (score: number): string => {
+    if (score >= 90) return '太棒了！你是打地鼠高手！';
+    if (score >= 80) return '非常好！继续保持！';
+    if (score >= 70) return '做得不错！';
+    if (score >= 60) return '及格了，还需要努力！';
+    if (score >= 40) return '继续加油，你可以的！';
+    return '别灰心，再试一次！';
+  };
+
   return (
     <GameContainer>
       <h1>
@@ -795,9 +828,17 @@ const App: React.FC = () => {
           <ModalContent>
             <h2>{translations[config.language].gameOver}</h2>
             <div className="score">{score}</div>
-            <div className="high-score">
-              {score > highScore ? translations[config.language].newRecord : translations[config.language].keepTrying}
-            </div>
+            <ScoreGrade score={score}>
+              {getScoreGrade(score)} - {score}分
+            </ScoreGrade>
+            <p style={{ marginTop: '10px', color: '#666' }}>
+              {getScoreDescription(score)}
+            </p>
+            {score > highScore && (
+              <p style={{ color: '#1890ff', fontWeight: 'bold' }}>
+                {translations[config.language].newHighScore}!
+              </p>
+            )}
             <Button onClick={startGame}>
               {translations[config.language].playAgain}
             </Button>
