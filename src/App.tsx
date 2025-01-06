@@ -474,6 +474,7 @@ const App: React.FC = () => {
   const [highScore, setHighScore] = useState(0);
   const [moles, setMoles] = useState<boolean[]>(Array(9).fill(false));
   const [whackedMoles, setWhackedMoles] = useState<boolean[]>(Array(9).fill(false));
+  const [positions, setPositions] = useState<number[]>(Array.from({length: 9}, (_, i) => i));
   const [isPaused, setIsPaused] = useState(false);
   const [showEndConfirm, setShowEndConfirm] = useState(false);
   const [showGameOver, setShowGameOver] = useState(false);
@@ -481,6 +482,21 @@ const App: React.FC = () => {
   const { settings, saveSettings } = useGameSettings();
   const [config, setConfig] = useState<GameConfig>(settings);
   const [tempConfig, setTempConfig] = useState<GameConfig>(settings);
+
+  // 随机打乱位置
+  const shufflePositions = useCallback(() => {
+    const newPositions = [...positions];
+    for (let i = newPositions.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [newPositions[i], newPositions[j]] = [newPositions[j], newPositions[i]];
+    }
+    setPositions(newPositions);
+  }, [positions]);
+
+  // 当游戏开始或页面加载时打乱位置
+  useEffect(() => {
+    shufflePositions();
+  }, [gameActive]);
 
   // 当settings改变时更新config
   useEffect(() => {
@@ -660,6 +676,7 @@ const App: React.FC = () => {
 
   // 开始游戏
   const startGame = () => {
+    shufflePositions(); // 游戏开始时打乱位置
     setScore(0);
     setGameActive(true);
     setIsPaused(false);
@@ -723,11 +740,11 @@ const App: React.FC = () => {
       </Button>
 
       <Grid>
-        {Array(9).fill(null).map((_, index) => (
-          <HoleContainer key={index} onClick={() => whackMole(index)}>
+        {positions.map((position, index) => (
+          <HoleContainer key={position} onClick={() => whackMole(position)}>
             <Mole 
-              active={moles[index]}
-              className={whackedMoles[index] ? 'whacked' : ''}
+              active={moles[position]}
+              className={whackedMoles[position] ? 'whacked' : ''}
             />
           </HoleContainer>
         ))}
